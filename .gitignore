@@ -1,0 +1,27 @@
+
+# dependencies
+node_modules
+node_modules/
+/node_modules/
+
+dist/
+
+
+.env
+
+env
+/env
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo

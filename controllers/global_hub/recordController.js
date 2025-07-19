@@ -1,0 +1,93 @@
+const recordModel = require("../../model/global_hub/recordModal");
+const moment = require("moment");
+
+exports.createRecord = async (req, res) => {
+  try {
+    console.log("req?.body: ", req?.body);
+
+    const id = await recordModel.createRecord(req?.body);
+    res.status(201).json({ message: " created", id });
+  } catch (error) {
+    console.error("Controller:createRecord Error:", error, moment().format());
+    res.status(500).json({ message: "Server error while creating record" });
+  }
+};
+
+exports.getAllRecords = async (req, res) => {
+  try {
+    const record = await recordModel.getAllRecords(req?.query.id);
+    res.json({ success: true, record });
+  } catch (error) {
+    console.error("Controller:getAllRecords Error:", error, moment().format());
+    res.status(500).json({ message: "Server error while fetching records" });
+  }
+};
+
+exports.updateRecord = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await recordModel.updateRecord(id, req.body);
+    if (result) 
+      
+    
+    res.json({ success: true, message: "Record updated", result });
+  } catch (error) {
+    console.error("Controller:updateRecord Error:", error, moment().format());
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while updating record" });
+  }
+};
+
+exports.deleteRecord = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await recordModel.deleteRecord(id);
+    res.json({ success: true, message: "Record deleted", result });
+  } catch (error) {
+    console.error("Controller:deleteRecord Error:", error, moment().format());
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting record" });
+  }
+};
+
+//  const payload = {
+//       user_id: req?.body?.id,
+//       admin_id: req?.body?.id,
+//       record_no: req?.body?.recordNo,
+//       lead_no: req?.body?.leadNo,
+//       applicant_first_name: req?.body?.applicantFirstName,
+//       applicant_last_name: req?.body?.applicantLastName,
+//       street_address: req?.body?.streetAddress,
+//       city: req?.body?.city,
+//       zip_code: req?.body?.zipCode,
+//       applicant_dob: req?.body?.applicantDOB,
+//       co_applicant_first_name: req?.body?.coApplicantFirstName,
+//       co_applicant_last_name: req?.body?.coApplicantLastName,
+//       best_time_to_call: req?.body?.bestTimeToCall,
+//       personal_remark: req?.body?.personalRemark,
+//       type_of_property: req?.body?.typeOfProperty,
+//       property_value: req?.body?.propertyValue,
+//       mortgage_type: req?.body?.mortgageType,
+//       loan_amount: req?.body?.loanAmount,
+//       loan_term: req?.body?.loanTerm,
+//       interest_type: req?.body?.interestType,
+//       monthly_installment: req?.body?.monthlyInstallment,
+//       existing_loan: req?.body?.existingLoan,
+//       annual_income: req?.body?.annualIncome,
+//       down_payment: req?.body?.downPayment,
+//       asset_remark: req?.body?.assetRemark,
+//       lender_name: req?.body?.lenderName,
+//       loan_officer_first_name: req?.body?.loanOfficerFirstName,
+//       loan_officer_last_name: req?.body?.loanOfficerLastName,
+//       tr_number: req?.body?.trNumber,
+//       ni_number: req?.body?.niNumber,
+//       occupation: req?.body?.occupation,
+//       other_income: req?.body?.otherIncome,
+//       credit_card_type: req?.body?.creditCardType,
+//       credit_score: req?.body?.creditScore,
+//       official_remark: req?.body?.officialRemark,
+//       created_at: req?.body?.createdAt,
+//       updated_at: req?.body?.updatedAt,
+//     }
