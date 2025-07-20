@@ -30,6 +30,11 @@ router.get("/get/all/records/by/id", recordController.getAllRecords);
 router.post("/update/record/by/id/:id", recordController.updateRecord);
 router.delete("/delete/record/by/id/:id", recordController.deleteRecord);
 
+// get admin and user by role and id
+router.get("/get/admin/user/by/role/id", adminController.getUsersByRoleAndId);
+router.delete("/delete/admin/user/by/id/:id", adminController.deleteAdmin);
+router.post("/update/admin/:id", adminController.updateAdminThree);
+
 // dashboardController
 router.get("/stats", dashboardController.getDashboardStats);
 module.exports = router;

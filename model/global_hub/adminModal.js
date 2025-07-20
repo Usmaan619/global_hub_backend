@@ -67,7 +67,7 @@ exports.updateAdmin = async (id, updates) => {
 };
 
 // Delete Admin
-exports.deleteAdmin = async (id) => {
+exports.deleteAdminOnly = async (id) => {
   try {
     return await withConnection(async (connection) => {
       const [result] = await connection.execute(
@@ -79,5 +79,292 @@ exports.deleteAdmin = async (id) => {
   } catch (error) {
     console.error("Model:deleteAdmin Error:", error, moment().format());
     throw new Error("Database error while deleting admin");
+  }
+};
+
+exports.createUserByAdmin = async ({ name, username, password, admin_id }) => {
+  try {
+    return await withConnection(async (connection) => {
+      // 1. Get current user count for this admin
+      const [userCountResult] = await connection.execute(
+        `SELECT COUNT(*) AS user_count FROM users WHERE admin_id = ?`,
+        [admin_id]
+      );
+      const userCount = userCountResult[0].user_count;
+
+      // 2. Get user limit for the admin
+      const [adminLimitResult] = await connection.execute(
+        `SELECT user_limit FROM admins WHERE id = ?`,
+        [admin_id]
+      );
+
+      if (adminLimitResult.length === 0) {
+        throw new Error("Admin not found");
+      }
+
+      const userLimit = adminLimitResult[0].user_limit;
+
+      // 3. Check if user can be created
+      if (userCount >= userLimit) {
+        throw new Error("User limit exceeded for this admin");
+      }
+
+      // 4. Create new user
+      const [result] = await connection.execute(
+        `INSERT INTO users (name, username, password, admin_id) VALUES (?, ?, ?, ?)`,
+        [name, username, password, admin_id]
+      );
+
+      return result.insertId;
+    });
+  } catch (error) {
+    console.error("Model:createUser Error:", error);
+    throw new Error("Database error while creating user");
+  }
+};
+
+// exports.getUsersByRoleAndId = async (role, id = null) => {
+//   try {
+//     const result = await withConnection(async (connection) => {
+//       let users = {};
+
+//       if (role === "superadmin") {
+//         // Superadmin ke direct + indirect users based on created_by field
+//         const [allUsers] = await connection.execute(
+//           `SELECT id, name, username, admin_id, created_by, created_at
+//            FROM users
+//            WHERE created_by = ?`,
+//           [role]
+//         );
+
+//         users = {
+//           all_users: allUsers,
+//         };
+//       } else if (role === "admin") {
+//         if (!id) {
+//           return {
+//             success: false,
+//             message: "Admin ID is required for role 'admin'",
+//           };
+//         }
+
+//         const [adminUsers] = await connection.execute(
+//           `SELECT id, name, username, admin_id, created_by, created_at
+//            FROM users
+//            WHERE admin_id = ?`,
+//           [id]
+//         );
+
+//         users = {
+//           admin_users: adminUsers,
+//         };
+//       } else {
+//         return {
+//           success: false,
+//           message: "Invalid role",
+//         };
+//       }
+
+//       return users;
+//     });
+
+//     return {
+//       success: true,
+//       data: result,
+//     };
+//   } catch (error) {
+//     console.error("Error in getUsersByRoleAndId:", error);
+//     throw error;
+//   }
+// };
+
+// exports.getUsersByRoleAndId = async (role, id = null) => {
+//   try {
+//     const result = await withConnection(async (connection) => {
+//       let response = {};
+
+//       if (role === "superadmin") {
+//         // 1. Get all admins created by superadmin
+//         const [admins] = await connection.execute(
+//           `SELECT * FROM admins WHERE created_by = ?`,
+//           [role]
+//         );
+
+//         // 2. For each admin, get user count
+//         const adminsWithUserCount = await Promise.all(
+//           admins.map(async (admin) => {
+//             const [userCount] = await connection.execute(
+//               `SELECT COUNT(*) as count FROM users WHERE admin_id = ?`,
+//               [admin.id]
+//             );
+
+//             return {
+//               admin_id: admin.id,
+//               name: admin.name,
+//               username: admin.username,
+//               admin_created_at: admin.created_at,
+//               role_name: admin?.role,
+//               admin_password: admin.password,
+//               user_count: userCount[0].count,
+//             };
+//           })
+//         );
+
+//         response = {
+//           admins: adminsWithUserCount,
+//         };
+//       } else if (role === "admin") {
+//         if (!id) {
+//           return {
+//             success: false,
+//             message: "Admin ID is required for role 'admin'",
+//           };
+//         }
+
+//         const [adminUsers] = await connection.execute(
+//           `SELECT id, * FROM users WHERE admin_id = ?`,
+//           [id]
+//         );
+
+//         response = {
+//           admin_id: id,
+//           total_users: adminUsers.length,
+//           admin_users: adminUsers,
+//           role_name: users?.role,
+//         };
+//       } else {
+//         return {
+//           success: false,
+//           message: "Invalid role",
+//         };
+//       }
+
+//       return response;
+//     });
+
+//     return {
+//       success: true,
+//       data: result,
+//     };
+//   } catch (error) {
+//     console.error("Error in getUsersByRoleAndId:", error);
+//     throw error;
+//   }
+// };
+
+exports.getUsersByRoleAndId = async (role, id = null) => {
+  try {
+    const result = await withConnection(async (connection) => {
+      let response = {};
+
+      if (role === "superadmin") {
+        // 1. Get all admins created by superadmin
+        const [admins] = await connection.execute(
+          `SELECT * FROM admins WHERE created_by = ?`,
+          [role]
+        );
+
+        // 2. For each admin, get full user data
+        const adminsWithUsers = await Promise.all(
+          admins.map(async (admin) => {
+            const [users] = await connection.execute(
+              `SELECT * FROM users WHERE admin_id = ?`,
+              [admin.id]
+            );
+
+            return {
+              admin_id: admin.id,
+              name: admin.name,
+              username: admin.username,
+              admin_created_at: admin.created_at,
+              user_limit: admin?.user_limit,
+              role_name: admin?.role,
+              admin_password: admin.password,
+              user_count: users?.length, // Full user data
+              users: users, // Full user data
+            };
+          })
+        );
+
+        response = {
+          admins: adminsWithUsers,
+        };
+      } else if (role === "admin") {
+        if (!id) {
+          return {
+            success: false,
+            message: "Admin ID is required for role 'admin'",
+          };
+        }
+
+        const [adminUsers] = await connection.execute(
+          `SELECT * FROM users WHERE admin_id = ?`,
+          [id]
+        );
+
+        response = {
+          admin_id: id,
+          total_users: adminUsers.length,
+          admin_users: adminUsers,
+        };
+      } else {
+        return {
+          success: false,
+          message: "Invalid role",
+        };
+      }
+
+      return response;
+    });
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    console.error("Error in getUsersByRoleAndId:", error);
+    throw error;
+  }
+};
+
+exports.deleteAdmin = async (id) => {
+  try {
+    return await withConnection(async (connection) => {
+      // Step 1: Delete related users
+      await connection.execute("DELETE FROM users WHERE admin_id = ?", [id]);
+
+      // Step 2: Delete the admin
+      const [result] = await connection.execute(
+        "DELETE FROM admins WHERE id = ?",
+        [id]
+      );
+
+      return result?.affectedRows > 0;
+    });
+  } catch (error) {
+    console.error("Model:deleteAdmin Error:", error, moment().format());
+    throw new Error("Database error while deleting admin");
+  }
+};
+
+exports.updateAdminThree = async (id, updates) => {
+  try {
+    const { name, username, password, user_limit } = updates;
+    return await withConnection(async (connection) => {
+      const query = `
+        UPDATE admins SET name = ?, username = ?, password = ?, user_limit = ?
+        WHERE id = ?`;
+      const [result] = await connection.execute(query, [
+        name,
+        username,
+        password,
+        user_limit,
+        id,
+      ]);
+      return result?.affectedRows > 0;
+    });
+  } catch (error) {
+    console.error("Model:updateAdmin Error:", error, moment().format());
+    throw new Error("Database error while updating admin");
   }
 };

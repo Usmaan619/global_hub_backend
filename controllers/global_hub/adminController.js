@@ -49,12 +49,58 @@ exports.deleteAdmin = async (req, res) => {
   try {
     const id = req.params.id;
     const result = await adminModel.deleteAdmin(id);
-    return res.json({ message: "Admin deleted", result });
+    return res.json({success: true, message: "Admin deleted", result });
   } catch (error) {
     console.error("Controller:deleteAdmin Error:", error, moment().format());
     return res.status(500).json({
       message: "Server error while deleting admin",
       date: moment().format("MMMM Do YYYY, h:mm:ss a"),
+      success: false,
+    });
+  }
+};
+
+exports.createUserByAdmin = async (req, res) => {
+  try {
+    const id = await adminModel.createUserByAdmin(req.body);
+    return res.status(201).json({ message: "Admin created successfully", id });
+  } catch (error) {
+    console.error("Controller:createAdmin Error:", error, moment().format());
+    return res.status(500).json({
+      message: "Server error while creating admin",
+      date: moment().format("MMMM Do YYYY, h:mm:ss a"),
+    });
+  }
+};
+
+exports.getUsersByRoleAndId = async (req, res) => {
+  try {
+    const { role, id } = req.query;
+
+    const user = await adminModel.getUsersByRoleAndId(role, id);
+    return res
+      .status(201)
+      .json({ message: "Admin created successfully", success: true, user });
+  } catch (error) {
+    console.error("Controller:createAdmin Error:", error, moment().format());
+    return res.status(500).json({
+      message: "Server error while creating admin",
+      date: moment().format("MMMM Do YYYY, h:mm:ss a"),
+    });
+  }
+};
+
+exports.updateAdminThree = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await adminModel.updateAdminThree(id, req.body);
+    return res.json({success:true, message: "Admin updated", result });
+  } catch (error) {
+    console.error("Controller:updateAdmin Error:", error, moment().format());
+    return res.status(500).json({
+      message: "Server error while updating admin",
+      date: moment().format("MMMM Do YYYY, h:mm:ss a"),
+      success:false,
     });
   }
 };
