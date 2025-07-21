@@ -35,6 +35,10 @@ router.get("/get/admin/user/by/role/id", adminController.getUsersByRoleAndId);
 router.delete("/delete/admin/user/by/id/:id", adminController.deleteAdmin);
 router.post("/update/admin/:id", adminController.updateAdminThree);
 
+router.get("/download/csv/user/by/id", adminController.downloadUserRecordsExcel);
+
+
+
 // dashboardController
 router.get("/stats", dashboardController.getDashboardStats);
 module.exports = router;

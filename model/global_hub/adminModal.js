@@ -252,24 +252,117 @@ exports.createUserByAdmin = async ({ name, username, password, admin_id }) => {
 //   }
 // };
 
+// final
+// exports.getUsersByRoleAndId = async (role, id = null) => {
+//   try {
+//     const result = await withConnection(async (connection) => {
+//       let response = {};
+
+//       if (role === "superadmin") {
+//         // 1. Get all admins created by superadmin
+//         const [admins] = await connection.execute(
+//           `SELECT * FROM admins WHERE created_by = ?`,
+//           [role]
+//         );
+
+//         // 2. For each admin, get full user data
+//         const adminsWithUsers = await Promise.all(
+//           admins.map(async (admin) => {
+//             const [users] = await connection.execute(
+//               `SELECT * FROM users WHERE admin_id = ?`,
+//               [admin.id]
+//             );
+
+//             return {
+//               admin_id: admin.id,
+//               name: admin.name,
+//               username: admin.username,
+//               admin_created_at: admin.created_at,
+//               user_limit: admin?.user_limit,
+//               role_name: admin?.role,
+//               admin_password: admin.password,
+//               user_count: users?.length, // Full user data
+//               users: users, // Full user data
+//             };
+//           })
+//         );
+
+//         response = {
+//           admins: adminsWithUsers,
+//         };
+//       } else if (role === "admin") {
+//         if (!id) {
+//           return {
+//             success: false,
+//             message: "Admin ID is required for role 'admin'",
+//           };
+//         }
+
+//         const [adminUsers] = await connection.execute(
+//           `SELECT * FROM users WHERE admin_id = ?`,
+//           [id]
+//         );
+
+//         response = {
+//           admin_id: id,
+//           total_users: adminUsers.length,
+//           admin_users: adminUsers,
+//         };
+//       } else {
+//         return {
+//           success: false,
+//           message: "Invalid role",
+//         };
+//       }
+
+//       return response;
+//     });
+
+//     return {
+//       success: true,
+//       data: result,
+//     };
+//   } catch (error) {
+//     console.error("Error in getUsersByRoleAndId:", error);
+//     throw error;
+//   }
+// };
+
 exports.getUsersByRoleAndId = async (role, id = null) => {
   try {
     const result = await withConnection(async (connection) => {
       let response = {};
 
       if (role === "superadmin") {
-        // 1. Get all admins created by superadmin
         const [admins] = await connection.execute(
           `SELECT * FROM admins WHERE created_by = ?`,
           [role]
         );
 
-        // 2. For each admin, get full user data
-        const adminsWithUsers = await Promise.all(
+        const adminsWithUsersAndRecords = await Promise.all(
           admins.map(async (admin) => {
+            // Get users created by this admin
             const [users] = await connection.execute(
               `SELECT * FROM users WHERE admin_id = ?`,
               [admin.id]
+            );
+
+            // For each user, count how many records they created
+            let totalRecords = 0;
+            const usersWithRecordCount = await Promise.all(
+              users.map(async (user) => {
+                const [records] = await connection.execute(
+                  `SELECT COUNT(*) as record_count FROM records WHERE user_id = ?`,
+                  [user.id]
+                );
+                const recordCount = records[0].record_count;
+                totalRecords += recordCount;
+
+                return {
+                  ...user,
+                  record_count: recordCount,
+                };
+              })
             );
 
             return {
@@ -280,14 +373,15 @@ exports.getUsersByRoleAndId = async (role, id = null) => {
               user_limit: admin?.user_limit,
               role_name: admin?.role,
               admin_password: admin.password,
-              user_count: users?.length, // Full user data
-              users: users, // Full user data
+              user_count: users.length,
+              total_records_created_by_users: totalRecords,
+              users: usersWithRecordCount,
             };
           })
         );
 
         response = {
-          admins: adminsWithUsers,
+          admins: adminsWithUsersAndRecords,
         };
       } else if (role === "admin") {
         if (!id) {
@@ -302,10 +396,28 @@ exports.getUsersByRoleAndId = async (role, id = null) => {
           [id]
         );
 
+        let totalRecords = 0;
+        const usersWithRecordCount = await Promise.all(
+          adminUsers.map(async (user) => {
+            const [records] = await connection.execute(
+              `SELECT COUNT(*) as record_count FROM records WHERE user_id = ?`,
+              [user.id]
+            );
+            const recordCount = records[0].record_count;
+            totalRecords += recordCount;
+
+            return {
+              ...user,
+              record_count: recordCount,
+            };
+          })
+        );
+
         response = {
           admin_id: id,
           total_users: adminUsers.length,
-          admin_users: adminUsers,
+          total_records_created_by_users: totalRecords,
+          admin_users: usersWithRecordCount,
         };
       } else {
         return {
@@ -368,3 +480,5 @@ exports.updateAdminThree = async (id, updates) => {
     throw new Error("Database error while updating admin");
   }
 };
+
+
