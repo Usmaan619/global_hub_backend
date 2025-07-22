@@ -67,10 +67,31 @@ exports.deleteUser = async (id) => {
         "DELETE FROM users WHERE id = ?",
         [id]
       );
-      return result;
+      return result.affectedRows > 0;
     });
   } catch (error) {
     console.error("Model:deleteUser Error:", error, moment().format());
     throw new Error("Database error while deleting user");
+  }
+};
+
+exports.updateUserByAdmin = async (id, updates) => {
+  try {
+    const { name, username, password } = updates;
+    return await withConnection(async (connection) => {
+      const query = `
+        UPDATE users
+        SET name = ?, username = ?, password = ? WHERE id = ?`;
+      const [result] = await connection.execute(query, [
+        name,
+        username,
+        password,
+        id,
+      ]);
+      return result;
+    });
+  } catch (error) {
+    console.error("Model:updateUser Error:", error, moment().format());
+    throw new Error("Database error while updating user");
   }
 };
