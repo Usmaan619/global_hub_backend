@@ -3,8 +3,6 @@ const moment = require("moment");
 
 exports.createRecord = async (req, res) => {
   try {
-    console.log("req?.body: ", req?.body);
-
     const id = await recordModel.createRecord(req?.body);
     res.status(201).json({ message: " created", id });
   } catch (error) {
@@ -27,10 +25,7 @@ exports.updateRecord = async (req, res) => {
   try {
     const id = req.params.id;
     const result = await recordModel.updateRecord(id, req.body);
-    if (result) 
-      
-    
-    res.json({ success: true, message: "Record updated", result });
+    if (result) res.json({ success: true, message: "Record updated", result });
   } catch (error) {
     console.error("Controller:updateRecord Error:", error, moment().format());
     res
