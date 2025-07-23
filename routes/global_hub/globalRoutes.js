@@ -22,7 +22,9 @@ router.delete("/:id", superAdminController.deleteSuperAdmin);
 router.post("/create/user", userController.createUser);
 router.get("/", userController.getAllUsers);
 router.put("/:id", userController.updateUser);
-router.delete("/:id", userController.deleteUser);
+router.delete("/delete/user/by/id/:id", userController.deleteUser);
+router.post("/update/user/by/id/:id", userController.updateUserByAdmin);
+
 
 router.post("/create/record", recordController.createRecord);
 router.get("/get/all/records", recordController.getAllRecords);
@@ -35,9 +37,10 @@ router.get("/get/admin/user/by/role/id", adminController.getUsersByRoleAndId);
 router.delete("/delete/admin/user/by/id/:id", adminController.deleteAdmin);
 router.post("/update/admin/:id", adminController.updateAdminThree);
 
-router.get("/download/csv/user/by/id", adminController.downloadUserRecordsExcel);
-
-
+router.get(
+  "/download/csv/user/by/id",
+  adminController.downloadUserRecordsExcel
+);
 
 // dashboardController
 router.get("/stats", dashboardController.getDashboardStats);

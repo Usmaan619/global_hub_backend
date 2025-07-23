@@ -41,16 +41,29 @@ exports.updateUser = async (req, res) => {
   }
 };
 
+// Update
+exports.updateUserByAdmin = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await userModel.updateUserByAdmin(id, req.body);
+    return res.json({ success: true, message: "User updated", result });
+  } catch (error) {
+    console.error("Controller:updateUser Error:", error, moment().format());
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error while updating user" });
+  }
+};
+
 // Delete
 exports.deleteUser = async (req, res) => {
   try {
-    const id = req.params.id;
-    const result = await userModel.deleteUser(id);
-    return res.json({ message: "User deleted", result });
+    const result = await userModel.deleteUser(req.params.id);
+    return res.json({ success: true, message: "User deleted", result });
   } catch (error) {
     console.error("Controller:deleteUser Error:", error, moment().format());
     return res
       .status(500)
-      .json({ message: "Server error while deleting user" });
+      .json({ success: false, message: "Server error while deleting user" });
   }
 };
