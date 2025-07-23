@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 const { connectToDatabase } = require("../config/dbConnection");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const createEmailTransporter = async () => {
   try {
@@ -23,16 +23,36 @@ const createEmailTransporter = async () => {
 };
 
 const withConnection = async (callback) => {
-  const connection = await connectToDatabase(); // Assume this establishes a DB connection
+  let connection;
   try {
+    connection = await connectToDatabase(); // Assumes a DB connection is returned
     return await callback(connection);
   } catch (err) {
-    console.error("Error in withConnection:---------------------", err);
-    connection.destroy(); // Destroy the connection if an error occurs
-    throw err; // Rethrow the error for higher-level handling
+    console.error("Database operation failed:", {
+      message: err.message,
+      stack: err.stack,
+    });
+
+    if (connection && typeof connection.destroy === "function") {
+      try {
+        connection.destroy(); // Forcefully close on error
+      } catch (destroyErr) {
+        console.error("Failed to destroy connection:", destroyErr);
+      }
+    }
+
+    throw err; // Rethrow for outer error handling
   } finally {
-    if (connection && connection.state !== "disconnected") {
-      connection.end(); // Gracefully end the connection if no errors occurred
+    if (
+      connection &&
+      typeof connection.end === "function" &&
+      connection.state !== "disconnected"
+    ) {
+      try {
+        await connection.end(); // Gracefully close if not already disconnected
+      } catch (endErr) {
+        console.error("Error ending DB connection:", endErr);
+      }
     }
   }
 };

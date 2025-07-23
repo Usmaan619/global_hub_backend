@@ -41,4 +41,7 @@ router.get("/download/csv/user/by/id", adminController.downloadUserRecordsExcel)
 
 // dashboardController
 router.get("/stats", dashboardController.getDashboardStats);
+router.get("/static/dashboard", dashboardController.getSuperAdminAndAdminDetailsCount);
+
+
 module.exports = router;
