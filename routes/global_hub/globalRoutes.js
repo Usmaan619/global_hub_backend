@@ -25,7 +25,6 @@ router.put("/:id", userController.updateUser);
 router.delete("/delete/user/by/id/:id", userController.deleteUser);
 router.post("/update/user/by/id/:id", userController.updateUserByAdmin);
 
-
 router.post("/create/record", recordController.createRecord);
 router.get("/get/all/records", recordController.getAllRecords);
 router.get("/get/all/records/by/id", recordController.getAllRecords);
@@ -44,5 +43,15 @@ router.get(
 
 // dashboardController
 router.get("/stats", dashboardController.getDashboardStats);
-router.get("/static/dashboard", dashboardController.getSuperAdminAndAdminDetailsCount);
+router.get(
+  "/static/dashboard",
+  dashboardController.getSuperAdminAndAdminDetailsCount
+);
+
+// settings
+// GET /api/lock-status
+router.get("/lock-status", dashboardController.getLockStatus);
+
+// POST /api/lock-status/toggle
+router.post("/lock-status/toggle", dashboardController.getLockStatusToggle);
 module.exports = router;
