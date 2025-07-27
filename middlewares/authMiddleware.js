@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 
 const SECRET_KEY = process.env.JWT_SECRET || "your_secret_key";
 
-exports.authMiddleware = (req, res, next) => {
+exports.protect = (req, res, next) => {
   try {
     const token = req.headers["authorization"] || req.headers["Authorization"];
 
@@ -12,7 +12,9 @@ exports.authMiddleware = (req, res, next) => {
 
     jwt.verify(token, SECRET_KEY, (err, decoded) => {
       if (err) {
-        return res.status(403).json({ message: "Forbidden: Invalid token" });
+        return res
+          .status(403)
+          .json({ success: false, message: "Forbidden: Invalid token" });
       }
 
       req.user = decoded;
@@ -20,15 +22,13 @@ exports.authMiddleware = (req, res, next) => {
     });
   } catch (error) {
     console.error("Error in authMiddleware:", error);
-    res.json({ message: error });
+    res.json({ success: false, message: error });
   }
 };
 
-const jwt = require("jsonwebtoken");
-
-exports.protect = (roles = []) => {
+exports.protects = (roles = []) => {
   return (req, res, next) => {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.Authorization;
 
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Unauthorized: No token" });

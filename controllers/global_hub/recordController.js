@@ -1,5 +1,6 @@
 const recordModel = require("../../model/global_hub/recordModal");
 const moment = require("moment");
+const { withConnection } = require("../../utils/helper");
 
 exports.createRecord = async (req, res) => {
   try {
@@ -13,7 +14,7 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
-    const record = await recordModel.getAllRecords(req?.query.id);
+    const record = await recordModel.getAllRecords(req?.query.id,req?.query.role);
     res.json({ success: true, record });
   } catch (error) {
     console.error("Controller:getAllRecords Error:", error, moment().format());
@@ -44,6 +45,40 @@ exports.deleteRecord = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Server error while deleting record" });
+  }
+};
+
+exports.deleteCurrentMonthRecords = async (req, res) => {
+  try {
+    return await withConnection(async (conn) => {
+      const user = req.user;
+
+      //  Only superadmin can delete
+      if (user.role !== "superadmin") {
+        return res
+          .status(403)
+          .json({ message: "Access denied: Superadmin only." });
+      }
+
+      //  Get current month's start and end in SQL datetime format
+      const startDate = moment().startOf("month").format("YYYY-MM-DD HH:mm:ss");
+      const endDate = moment().endOf("month").format("YYYY-MM-DD HH:mm:ss");
+
+      //  Delete records between those dates
+
+      const result = await conn.query(
+        "DELETE FROM records WHERE created_at >= ? AND created_at <= ?",
+        [startDate, endDate]
+      );
+      return res.status(200).json({
+        message: ` ${
+          result.affectedRows
+        } record(s) deleted for ${moment().format("MMMM YYYY")}.`,
+      });
+    });
+  } catch (error) {
+    console.error("Delete Error:", error);
+    return res.status(500).json({ message: " Server error." });
   }
 };
 

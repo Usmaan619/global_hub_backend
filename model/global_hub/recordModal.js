@@ -131,20 +131,20 @@ exports.createRecord = async (data) => {
   }
 };
 
-exports.getAllRecords = async (id) => {
-  try {
-    return await withConnection(async (conn) => {
-      const [rows] = await conn.execute(
-        "SELECT * FROM records WHERE user_id = ? ORDER BY id DESC",
-        [id]
-      );
-      return rows;
-    });
-  } catch (error) {
-    console.error("Model:getAllRecords Error:", error, moment().format());
-    throw new Error("Database error while fetching records");
-  }
-};
+// exports.getAllRecords = async (id) => {
+//   try {
+//     return await withConnection(async (conn) => {
+//       const [rows] = await conn.execute(
+//         "SELECT * FROM records WHERE user_id = ? ORDER BY id DESC",
+//         [id]
+//       );
+//       return rows;
+//     });
+//   } catch (error) {
+//     console.error("Model:getAllRecords Error:", error, moment().format());
+//     throw new Error("Database error while fetching records");
+//   }
+// };
 exports.getRecordById = async (id) => {
   try {
     return await withConnection(async (conn) => {
@@ -190,5 +190,47 @@ exports.deleteRecord = async (id) => {
   } catch (error) {
     console.error("Model:deleteRecord Error:", error, moment().format());
     throw new Error("Database error while deleting record");
+  }
+};
+exports.getAllRecords = async (userId, role) => {
+  try {
+    return await withConnection(async (conn) => {
+      let query = '';
+      let params = [];
+
+      if (role === 'superadmin') {
+        // Superadmin gets all records
+        query = `SELECT * FROM records ORDER BY id DESC`;
+
+      } else if (role === 'admin') {
+        // Admin gets records of users under them
+        query = `
+          SELECT r.*
+          FROM records r
+          JOIN users u ON r.user_id = u.id
+          WHERE u.admin_id = ?
+          ORDER BY r.id DESC
+        `;
+        params = [userId];
+
+      } else if (role === 'user') {
+        // Normal user gets only their own records
+        query = `
+          SELECT * FROM records
+          WHERE user_id = ?
+          ORDER BY id DESC
+        `;
+        params = [userId];
+
+      } else {
+        throw new Error("Invalid role");
+      }
+
+      const [rows] = await conn.execute(query, params);
+      return rows;
+    });
+  } catch (error) {
+    console.error("Model:getAllRecords Error:", error);
+    throw new Error("Database error while fetching records");
   }
 };

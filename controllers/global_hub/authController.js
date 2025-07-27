@@ -86,7 +86,7 @@ exports.loginAutoDetect = async (req, res) => {
     const token = jwt.sign(
       { id: matchedUser.id, role: detectedRole },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "1day" }
     );
 
     res.json({
@@ -243,14 +243,116 @@ exports.loginAutoDetect = async (req, res) => {
 //   }
 // };
 
+// exports.registerAutoDetect = async (req, res) => {
+//   const { role, name, username, password, admin_id, user_limit, created_by } =
+//     req.body;
+
+//   if (!role || !name || !username || !password) {
+//     return res.status(400).json({ message: "Missing required fields" });
+//   }
+
+//   const validRoles = {
+//     superadmin: { table: "super_admins", hash: true },
+//     admin: { table: "admins", hash: false },
+//     user: { table: "users", hash: false },
+//   };
+
+//   const config = validRoles[role];
+//   if (!config) {
+//     return res.status(400).json({ message: "Invalid role" });
+//   }
+
+//   try {
+//     const existing = await withConnection(async (conn) => {
+//       const [rows] = await conn.execute(
+//         `SELECT id FROM ${config.table} WHERE username = ?`,
+//         [username]
+//       );
+//       return rows.length > 0;
+//     });
+
+//     if (existing) {
+//       return res
+//         .status(409)
+//         .json({ success: false, message: "Username already exists" });
+//     }
+
+//     // User limit check for "user" role
+//     if (role === "user") {
+//       const userLimitCheck = await withConnection(async (conn) => {
+//         const [userRows] = await conn.execute(
+//           `SELECT COUNT(*) AS total FROM users WHERE admin_id = ?`,
+//           [admin_id]
+//         );
+//         const [adminRows] = await conn.execute(
+//           `SELECT user_limit FROM admins WHERE id = ?`,
+//           [admin_id]
+//         );
+
+//         if (adminRows.length === 0) {
+//           throw new Error("Admin not found");
+//         }
+
+//         const currentUsers = userRows[0].total;
+//         const limit = adminRows[0].user_limit;
+
+//         if (currentUsers >= limit) {
+//           return false; // Exceeded
+//         }
+
+//         return true;
+//       });
+
+//       if (!userLimitCheck) {
+//         return res
+//           .status(403)
+//           .json({ message: "User creation limit exceeded for this admin" });
+//       }
+//     }
+
+//     // Insert new record
+//     const result = await withConnection(async (conn) => {
+//       const fields = ["name", "username", "password"];
+//       const values = [name, username, password];
+
+//       if (role === "user") {
+//         fields.push("admin_id", "created_by");
+//         values.push(admin_id, created_by);
+//       } else if (role === "admin") {
+//         fields.push("user_limit", "created_by");
+//         values.push(user_limit, created_by);
+//       }
+
+//       const query = `INSERT INTO ${config.table} (${fields.join(
+//         ", "
+//       )}) VALUES (${fields.map(() => "?").join(", ")})`;
+//       const [res] = await conn.execute(query, values);
+//       return res.insertId;
+//     });
+
+//     res.status(201).json({
+//       message: `${role} registered successfully`,
+//       success: true,
+//       id: result,
+//     });
+//   } catch (err) {
+//     console.error("Error in registerAutoDetect:", err);
+//     res
+//       .status(500)
+//       .json({ success: false, message: "Server error", error: err.message });
+//   }
+// };
+
 exports.registerAutoDetect = async (req, res) => {
   const { role, name, username, password, admin_id, user_limit, created_by } =
     req.body;
 
+  // Step 1: Validate required fields
   if (!role || !name || !username || !password) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  // Step 2: Map role to table and password hashing config
   const validRoles = {
     superadmin: { table: "super_admins", hash: true },
     admin: { table: "admins", hash: false },
@@ -263,6 +365,7 @@ exports.registerAutoDetect = async (req, res) => {
   }
 
   try {
+    // Step 3: Check if username already exists
     const existing = await withConnection(async (conn) => {
       const [rows] = await conn.execute(
         `SELECT id FROM ${config.table} WHERE username = ?`,
@@ -272,57 +375,78 @@ exports.registerAutoDetect = async (req, res) => {
     });
 
     if (existing) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Username already exists" });
+      return res.status(409).json({ message: "Username already exists" });
     }
 
-    // User limit check for "user" role
+    // Step 4: (Optional) Hash password if needed
+    // const finalPassword = config.hash
+    //   ? await bcrypt.hash(password, 10)
+    //   : password;
+
+    const finalPassword = password; // Use this if you're not hashing
+
+    // Step 5: Build insert fields and values
+    const fields = ["name", "username", "password"];
+    const values = [name, username, finalPassword];
+
     if (role === "user") {
-      const userLimitCheck = await withConnection(async (conn) => {
-        const [userRows] = await conn.execute(
-          `SELECT COUNT(*) AS total FROM users WHERE admin_id = ?`,
-          [admin_id]
-        );
-        const [adminRows] = await conn.execute(
-          `SELECT user_limit FROM admins WHERE id = ?`,
-          [admin_id]
-        );
+      // Check user limit only if admin_id is provided
+      if (admin_id) {
+        if (created_by === "admin") {
+          // Created by admin → check user_limit
+          const limitReached = await withConnection(async (conn) => {
+            const [[adminData]] = await conn.execute(
+              `SELECT user_limit FROM admins WHERE id = ?`,
+              [admin_id]
+            );
 
-        if (adminRows.length === 0) {
-          throw new Error("Admin not found");
+            if (!adminData) {
+              throw new Error("Admin not found");
+            }
+
+            const [[{ user_count }]] = await conn.execute(
+              `SELECT COUNT(*) AS user_count FROM users WHERE admin_id = ?`,
+              [admin_id]
+            );
+
+            return user_count >= adminData.user_limit;
+          });
+
+          if (limitReached) {
+            return res.status(403).json({
+              success: false,
+              message: "User limit reached for this admin",
+            });
+          }
+        } else if (created_by === "superadmin") {
+          // Created by superadmin → skip limit check, but ensure admin exists
+          const adminExists = await withConnection(async (conn) => {
+            const [rows] = await conn.execute(
+              `SELECT id FROM super_admins WHERE id = ?`,
+              [admin_id]
+            );
+            return rows.length > 0;
+          });
+
+          if (!adminExists) {
+            return res.status(400).json({
+              success: false,
+              message: "Assigned admin_id not found",
+            });
+          }
         }
-
-        const currentUsers = userRows[0].total;
-        const limit = adminRows[0].user_limit;
-
-        if (currentUsers >= limit) {
-          return false; // Exceeded
-        }
-
-        return true;
-      });
-
-      if (!userLimitCheck) {
-        return res
-          .status(403)
-          .json({ message: "User creation limit exceeded for this admin" });
       }
+
+      // Proceed to add user
+      fields.push("admin_id", "created_by");
+      values.push(admin_id, created_by);
+    } else if (role === "admin") {
+      fields.push("user_limit", "created_by");
+      values.push(user_limit, created_by); // default to 100
     }
 
-    // Insert new record
+    // Step 6: Insert into appropriate table
     const result = await withConnection(async (conn) => {
-      const fields = ["name", "username", "password"];
-      const values = [name, username, password];
-
-      if (role === "user") {
-        fields.push("admin_id", "created_by");
-        values.push(admin_id, created_by);
-      } else if (role === "admin") {
-        fields.push("user_limit", "created_by");
-        values.push(user_limit, created_by);
-      }
-
       const query = `INSERT INTO ${config.table} (${fields.join(
         ", "
       )}) VALUES (${fields.map(() => "?").join(", ")})`;
@@ -330,15 +454,18 @@ exports.registerAutoDetect = async (req, res) => {
       return res.insertId;
     });
 
+    // Step 7: Return success response
     res.status(201).json({
       message: `${role} registered successfully`,
       success: true,
       id: result,
     });
   } catch (err) {
-    console.error("Error in registerAutoDetect:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: err.message });
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
   }
 };
