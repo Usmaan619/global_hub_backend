@@ -14,7 +14,10 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
-    const record = await recordModel.getAllRecords(req?.query.id,req?.query.role);
+    const record = await recordModel.getAllRecords(
+      req?.query.id,
+      req?.query.role
+    );
     res.json({ success: true, record });
   } catch (error) {
     console.error("Controller:getAllRecords Error:", error, moment().format());
@@ -39,6 +42,19 @@ exports.deleteRecord = async (req, res) => {
   try {
     const id = req.params.id;
     const result = await recordModel.deleteRecord(id);
+    res.json({ success: true, message: "Record deleted", result });
+  } catch (error) {
+    console.error("Controller:deleteRecord Error:", error, moment().format());
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting record" });
+  }
+};
+
+exports.deleteRecordsByUserId = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await recordModel.deleteRecordsByUserId(id);
     res.json({ success: true, message: "Record deleted", result });
   } catch (error) {
     console.error("Controller:deleteRecord Error:", error, moment().format());

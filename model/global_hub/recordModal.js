@@ -195,14 +195,13 @@ exports.deleteRecord = async (id) => {
 exports.getAllRecords = async (userId, role) => {
   try {
     return await withConnection(async (conn) => {
-      let query = '';
+      let query = "";
       let params = [];
 
-      if (role === 'superadmin') {
+      if (role === "superadmin") {
         // Superadmin gets all records
         query = `SELECT * FROM records ORDER BY id DESC`;
-
-      } else if (role === 'admin') {
+      } else if (role === "admin") {
         // Admin gets records of users under them
         query = `
           SELECT r.*
@@ -212,8 +211,7 @@ exports.getAllRecords = async (userId, role) => {
           ORDER BY r.id DESC
         `;
         params = [userId];
-
-      } else if (role === 'user') {
+      } else if (role === "user") {
         // Normal user gets only their own records
         query = `
           SELECT * FROM records
@@ -221,7 +219,6 @@ exports.getAllRecords = async (userId, role) => {
           ORDER BY id DESC
         `;
         params = [userId];
-
       } else {
         throw new Error("Invalid role");
       }
@@ -232,5 +229,24 @@ exports.getAllRecords = async (userId, role) => {
   } catch (error) {
     console.error("Model:getAllRecords Error:", error);
     throw new Error("Database error while fetching records");
+  }
+};
+
+exports.deleteRecordsByUserId = async (userId) => {
+  try {
+    return await withConnection(async (conn) => {
+      const [result] = await conn.execute(
+        "DELETE FROM records WHERE user_id = ?",
+        [userId]
+      );
+      return result?.affectedRows > 0;
+    });
+  } catch (error) {
+    console.error(
+      "Model:deleteRecordsByUserId Error:",
+      error,
+      moment().format()
+    );
+    throw new Error("Database error while deleting user's records");
   }
 };

@@ -32,9 +32,31 @@ router.get("/get/all/records/by/id",protect, recordController.getAllRecords);
 router.post("/update/record/by/id/:id",protect, recordController.updateRecord);
 router.delete("/delete/record/by/id/:id",protect, recordController.deleteRecord);
 
+
+
+router.delete("/delete/all/record/by/user/id/:id",protect, recordController.deleteRecordsByUserId);
+
+
+router.post("/deleteAutoDetectAndrecord",protect, adminController.deleteAutoDetect);
+
+// deleteAutoDetect
+
+
 // get admin and user by role and id
 router.get("/get/admin/user/by/role/id",protect, adminController.getUsersByRoleAndId);
+
+
+// --
+// user delete
+
+router.delete("/delete/user/by/id/:id",protect, userController.deleteUser);
+
+// admin delete
+
 router.delete("/delete/admin/user/by/id/:id",protect, adminController.deleteAdmin);
+
+
+
 router.post("/update/admin/:id",protect, adminController.updateAdminThree);
 
 router.get(

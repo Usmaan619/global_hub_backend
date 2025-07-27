@@ -581,19 +581,42 @@ exports.getUsersByRoleAndId = async (role, id = null) => {
 exports.deleteAdmin = async (id) => {
   try {
     return await withConnection(async (connection) => {
-      // Step 1: Delete related users
+      await connection.beginTransaction();
+
+      // Step 1: Admin ke saare users ka ID nikalo
+      const [userRows] = await connection.execute(
+        "SELECT id FROM users WHERE admin_id = ?",
+        [id]
+      );
+
+      const userIds = userRows.map((user) => user.id);
+
+      // Step 2: Har user ke records hatao (agar koi user hai to)
+      if (userIds.length > 0) {
+        const placeholders = userIds.map(() => "?").join(",");
+        await connection.execute(
+          `DELETE FROM records WHERE user_id IN (${placeholders})`,
+          userIds
+        );
+      }
+
+      // Step 3: Users delete karo
       await connection.execute("DELETE FROM users WHERE admin_id = ?", [id]);
 
-      // Step 2: Delete the admin
+      // Step 4: Admin delete karo
       const [result] = await connection.execute(
         "DELETE FROM admins WHERE id = ?",
         [id]
       );
 
-      return result?.affectedRows > 0;
+      await connection.commit();
+
+      // Agar admin delete hua to true return karo
+      return result.affectedRows > 0;
     });
   } catch (error) {
-    console.error("Model:deleteAdmin Error:", error, moment().format());
+    console.error("Model:deleteAdmin Error:", error);
+    if (connection) await connection.rollback(); // Transaction rollback on error
     throw new Error("Database error while deleting admin");
   }
 };

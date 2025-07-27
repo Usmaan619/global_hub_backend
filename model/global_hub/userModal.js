@@ -67,6 +67,9 @@ exports.deleteUser = async (id) => {
         "DELETE FROM users WHERE id = ?",
         [id]
       );
+
+      await connection.execute(`DELETE FROM records WHERE user_id = ?`, [id]);
+
       return result.affectedRows > 0;
     });
   } catch (error) {
