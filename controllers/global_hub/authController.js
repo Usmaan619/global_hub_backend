@@ -4,6 +4,8 @@ const moment = require("moment");
 const { generateToken, withConnection } = require("../../utils/helper");
 const jwt = require("jsonwebtoken");
 
+const { v4: uuidv4 } = require("uuid");
+
 const loginHandler = (role, table) => async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -56,6 +58,7 @@ exports.loginAutoDetect = async (req, res) => {
   try {
     let matchedUser = null;
     let detectedRole = null;
+    const session = uuidv4();
 
     for (const { role, table, hash } of roles) {
       const user = await withConnection(async (conn) => {
@@ -72,6 +75,20 @@ exports.loginAutoDetect = async (req, res) => {
         if (valid) {
           matchedUser = user;
           detectedRole = role;
+
+          const update = await withConnection(async (conn) => {
+            /**
+             * Update session for the user in the database
+             * @param {string} table - The table name where the user is stored
+             * @param {string} username - The username of the user
+             * @returns {Promise<Object>} - The updated user object
+             */
+
+            const query = `UPDATE ${table} SET session = ? WHERE username = ?`;
+            const [result] = await conn.execute(query, [session, username]);
+            return result?.affectedRows > 0 ? { ...user, session } : null;
+          });
+
           break; // stop at first valid match
         }
       }
@@ -95,6 +112,7 @@ exports.loginAutoDetect = async (req, res) => {
       role: detectedRole,
       user: matchedUser,
       token,
+      session,
     });
   } catch (err) {
     console.error(err);
