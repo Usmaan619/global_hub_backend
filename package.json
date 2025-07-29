@@ -1,10 +1,10 @@
 {
   "name": "globalhub",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "app.js",
   "scripts": {
-    "start": "nodemon server.js",
-    "dev": "nodemon --inspect server.js",
+    "start": "nodemon app.js",
+    "dev": "nodemon --inspect app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Usman",
