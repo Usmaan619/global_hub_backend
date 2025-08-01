@@ -146,7 +146,7 @@ exports.downloadUserRecordsExcel = async (req, res) => {
       { header: "User ID", key: "user_id", width: 10 },
       { header: "Admin ID", key: "admin_id", width: 10 },
       { header: "Record No", key: "record_no", width: 15 },
-      { header: "Lead No", key: "lead_no", width: 15 },
+      { header: "Lead ID", key: "lead_no", width: 15 },
       {
         header: "Applicant First Name",
         key: "applicant_first_name",

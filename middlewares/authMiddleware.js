@@ -49,7 +49,6 @@ exports.protect = async (req, res, next) => {
         }
 
         const user = rows[0];
-        console.log("user.session_token: ", user.session);
 
         if (!user.session || user.session !== sessionHeader) {
           return res.status(603).json({
