@@ -142,9 +142,6 @@ exports.downloadUserRecordsExcel = async (req, res) => {
     // Define headers
     worksheet.columns = [
       { header: "Index", key: "idx", width: 10 },
-      { header: "ID", key: "id", width: 10 },
-      { header: "User ID", key: "user_id", width: 10 },
-      { header: "Admin ID", key: "admin_id", width: 10 },
       { header: "Record No", key: "record_no", width: 15 },
       { header: "Lead ID", key: "lead_no", width: 15 },
       {
