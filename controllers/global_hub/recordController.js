@@ -28,6 +28,7 @@ exports.getAllRecords = async (req, res) => {
 exports.updateRecord = async (req, res) => {
   try {
     const id = req.params.id;
+    delete req.body.image;
     const result = await recordModel.updateRecord(id, req.body);
     if (result) res.json({ success: true, message: "Record updated", result });
   } catch (error) {
