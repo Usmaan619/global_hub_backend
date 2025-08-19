@@ -484,21 +484,71 @@ exports.getSuperAdminAndAdminDetailsCount = async (req, res) => {
         total_user_record_count = count;
       }
 
-      // ===== TODAY'S TOTAL RECORD COUNT FOR USERS UNDER ADMIN =====
+      let today_user_record_count = 0;
+      if (user_id) {
+        const [[{ today_user_record_count: todayCount }]] =
+          await connection.query(
+            `SELECT COUNT(*) as today_user_record_count
+   FROM records
+   WHERE user_id = ? AND DATE(created_at) = CURDATE()`,
+            [user_id]
+          );
+
+        today_user_record_count = todayCount;
+      }
+
       let today_user_record_count_under_admin = 0;
+      let today_user_record_stats_under_admin = [];
 
       if (admin_id) {
+        // Total count of today's records under this admin
         const [todayUserRecords] = await connection.query(
           `SELECT COUNT(*) as today_user_record_count
-           FROM records
-           WHERE DATE(created_at) = CURDATE()
-           AND user_id IN (SELECT id FROM users WHERE admin_id = ?)`,
+     FROM records
+     WHERE DATE(created_at) = CURDATE()
+     AND user_id IN (SELECT id FROM users WHERE admin_id = ?)`,
           [admin_id]
         );
 
         today_user_record_count_under_admin =
           todayUserRecords[0].today_user_record_count;
+
+        // Per-user today's record count
+        const [perUserTodayRecords] = await connection.query(
+          `SELECT
+       u.id AS user_id,
+       u.username AS user_name,
+       COUNT(r.id) AS record_count
+     FROM users u
+     LEFT JOIN records r ON r.user_id = u.id AND DATE(r.created_at) = CURDATE()
+     WHERE u.admin_id = ?
+     GROUP BY u.id, u.username
+     ORDER BY u.username`,
+          [admin_id]
+        );
+
+        today_user_record_stats_under_admin = perUserTodayRecords.map((r) => ({
+          user_id: r.user_id,
+          user_name: r.user_name,
+          record_count: r.record_count,
+        }));
       }
+
+      // ===== TODAY'S TOTAL RECORD COUNT FOR USERS UNDER ADMIN =====
+      // let today_user_record_count_under_admin = 0;
+
+      // if (admin_id) {
+      //   const [todayUserRecords] = await connection.query(
+      //     `SELECT COUNT(*) as today_user_record_count
+      //      FROM records
+      //      WHERE DATE(created_at) = CURDATE()
+      //      AND user_id IN (SELECT id FROM users WHERE admin_id = ?)`,
+      //     [admin_id]
+      //   );
+
+      //   today_user_record_count_under_admin =
+      //     todayUserRecords[0].today_user_record_count;
+      // }
 
       // ===== FINAL RESPONSE =====
       res.json({
@@ -514,7 +564,9 @@ exports.getSuperAdminAndAdminDetailsCount = async (req, res) => {
         monthly_user_record_stats_admin,
         daily_user_record_stats,
         total_user_record_count,
-        today_user_record_count_under_admin, // added here
+        today_user_record_count_under_admin, // total count
+        today_user_record_stats_under_admin, // per-user stats
+        today_user_record_count,
       });
     });
   } catch (err) {
