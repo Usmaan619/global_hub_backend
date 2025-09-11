@@ -103,7 +103,7 @@ exports.loginAutoDetect = async (req, res) => {
     const token = jwt.sign(
       { id: matchedUser.id, role: detectedRole },
       process.env.JWT_SECRET,
-      { expiresIn: "1day" }
+      { expiresIn: "30d" }
     );
 
     res.json({
