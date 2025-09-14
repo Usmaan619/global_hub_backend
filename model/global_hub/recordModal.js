@@ -251,56 +251,13 @@ exports.deleteRecordsByUserId = async (userId) => {
   }
 };
 
-// exports.getAllRecords = async (userId, role, page = 1, limit = 10) => {
-//   try {
-//     return await withConnection(async (conn) => {
-//       let query = "";
-//       let params = [];
-
-//       // Calculate offset
-//       const offset = (page - 1) * limit;
-
-//       if (role === "superadmin") {
-//         // Superadmin gets all records
-//         query = `
-//           SELECT * FROM records
-//           ORDER BY id DESC
-//           LIMIT ? OFFSET ?
-//         `;
-//         params = [limit, offset];
-//       } else if (role === "admin") {
-//         // Admin gets records of users under them
-//         query = `
-//           SELECT r.*
-//           FROM records r
-//           JOIN users u ON r.user_id = u.id
-//           WHERE u.admin_id = ?
-//           ORDER BY r.id DESC
-//           LIMIT ? OFFSET ?
-//         `;
-//         params = [userId, limit, offset];
-//       } else if (role === "user") {
-//         // Normal user gets only their own records
-//         query = `
-//           SELECT * FROM records
-//           WHERE user_id = ?
-//           ORDER BY id DESC
-//           LIMIT ? OFFSET ?
-//         `;
-//         params = [userId, limit, offset];
-//       } else {
-//         throw new Error("Invalid role");
-//       }
-
-//       const [rows] = await conn.execute(query, params);
-//       return rows;
-//     });
-//   } catch (error) {
-//     console.error("Model:getAllRecords Error:", error);
-//     throw new Error("Database error while fetching records");
-//   }
-// };
-exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") => {
+exports.getAllRecords = async (
+  userId,
+  role,
+  page = 1,
+  limit = 10,
+  search = ""
+) => {
   try {
     return await withConnection(async (conn) => {
       let whereClause = "";
@@ -308,12 +265,9 @@ exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") 
       let params = [];
       let countParams = [];
 
-      // Coerce pagination safely
-      const pageNum = Math.max(1, parseInt(page, 10) || 1);
-      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
-      const offsetNum = (pageNum - 1) * limitNum;
+      const offset = (page - 1) * limit;
 
-      // Optional search
+      // Add search filter (optional)
       let searchClause = "";
       if (search) {
         searchClause = ` AND r.record_no LIKE ?`;
@@ -321,13 +275,12 @@ exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") 
         countParams.push(`%${search}%`);
       }
 
-      // Role-based filters
       if (role === "superadmin") {
         whereClause = "1";
       } else if (role === "admin") {
         joinClause = "JOIN users u ON r.user_id = u.id";
         whereClause = "u.admin_id = ?";
-        params.unshift(userId);
+        params.unshift(userId); // for both SELECT and COUNT
         countParams.unshift(userId);
       } else if (role === "user") {
         whereClause = "r.user_id = ?";
@@ -337,37 +290,33 @@ exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") 
         throw new Error("Invalid role");
       }
 
-      const baseFrom = `
+      const query = `
+        SELECT r.*
+        FROM records r
+        ${joinClause}
+        WHERE ${whereClause} ${searchClause}
+        ORDER BY r.id DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const countQuery = `
+        SELECT COUNT(*) as total
         FROM records r
         ${joinClause}
         WHERE ${whereClause} ${searchClause}
       `;
 
-      const countQuery = `
-        SELECT COUNT(*) AS total
-        ${baseFrom}
-      `;
-
-      const selectQuery = `
-        SELECT r.*
-        ${baseFrom}
-        ORDER BY r.id DESC
-        LIMIT ? OFFSET ?
-      `;
-
-      // COUNT with execute (no LIMIT/OFFSET here)
       const [countRows] = await conn.execute(countQuery, countParams);
-      const total = countRows?.total || 0;
+      const total = countRows[0].total;
 
-      // SELECT with query to avoid execute’s LIMIT/OFFSET issue
-      const selectParams = [...params, limitNum, offsetNum];
-      const [rows] = await conn.query(selectQuery, selectParams);
+      params.push(limit, offset);
+      const [rows] = await conn.execute(query, params);
 
       return {
         data: rows,
         total,
-        page: pageNum,
-        limit: limitNum,
+        page,
+        limit,
       };
     });
   } catch (error) {
@@ -375,4 +324,3 @@ exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") 
     throw new Error("Database error while fetching records");
   }
 };
-
