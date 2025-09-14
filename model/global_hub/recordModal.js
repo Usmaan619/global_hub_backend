@@ -300,40 +300,121 @@ exports.deleteRecordsByUserId = async (userId) => {
 //     throw new Error("Database error while fetching records");
 //   }
 // };
-exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") => {
+// exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") => {
+//   try {
+//     return await withConnection(async (conn) => {
+//       let whereClause = "";
+//       let joinClause = "";
+//       let params = [];
+//       let countParams = [];
+
+//       const offset = (page - 1) * limit;
+
+//       // Add search filter (optional)
+//       let searchClause = "";
+//       if (search) {
+//         searchClause = ` AND r.record_no LIKE ?`;
+//         params.push(`%${search}%`);
+//         countParams.push(`%${search}%`);
+//       }
+
+//       if (role === "superadmin") {
+//         whereClause = "1";
+//       } else if (role === "admin") {
+//         joinClause = "JOIN users u ON r.user_id = u.id";
+//         whereClause = "u.admin_id = ?";
+//         params.unshift(userId); // for both SELECT and COUNT
+//         countParams.unshift(userId);
+//       } else if (role === "user") {
+//         whereClause = "r.user_id = ?";
+//         params.unshift(userId);
+//         countParams.unshift(userId);
+//       } else {
+//         throw new Error("Invalid role");
+//       }
+
+//       const query = `
+//         SELECT r.*
+//         FROM records r
+//         ${joinClause}
+//         WHERE ${whereClause} ${searchClause}
+//         ORDER BY r.id DESC
+//         LIMIT ? OFFSET ?
+//       `;
+
+//       const countQuery = `
+//         SELECT COUNT(*) as total
+//         FROM records r
+//         ${joinClause}
+//         WHERE ${whereClause} ${searchClause}
+//       `;
+
+//       const [countRows] = await conn.execute(countQuery, countParams);
+//       const total = countRows[0].total;
+
+//       params.push(limit, offset);
+//       const [rows] = await conn.execute(query, params);
+
+//       return {
+//         data: rows,
+//         total,
+//         page,
+//         limit,
+//       };
+//     });
+//   } catch (error) {
+//     console.error("Model:getAllRecords Error:", error);
+//     throw new Error("Database error while fetching records");
+//   }
+// };
+
+exports.getAllRecords = async (
+  userId,
+  role,
+  page = 1,
+  limit = 10,
+  search = ""
+) => {
   try {
     return await withConnection(async (conn) => {
-      let whereClause = "";
-      let joinClause = "";
-      let params = [];
-      let countParams = [];
-
       const offset = (page - 1) * limit;
 
-      // Add search filter (optional)
+      // Clauses and Parameters
+      let whereClause = "";
+      let joinClause = "";
+      const queryParams = [];
+      const countParams = [];
+
+      // Search Clause
       let searchClause = "";
       if (search) {
-        searchClause = ` AND r.record_no LIKE ?`;
-        params.push(`%${search}%`);
+        searchClause = " AND r.record_no LIKE ?";
+        queryParams.push(`%${search}%`);
         countParams.push(`%${search}%`);
       }
 
-      if (role === "superadmin") {
-        whereClause = "1";
-      } else if (role === "admin") {
-        joinClause = "JOIN users u ON r.user_id = u.id";
-        whereClause = "u.admin_id = ?";
-        params.unshift(userId); // for both SELECT and COUNT
-        countParams.unshift(userId);
-      } else if (role === "user") {
-        whereClause = "r.user_id = ?";
-        params.unshift(userId);
-        countParams.unshift(userId);
-      } else {
-        throw new Error("Invalid role");
+      // Role-based filtering
+      switch (role) {
+        case "superadmin":
+          whereClause = "1";
+          break;
+        case "admin":
+          joinClause = "JOIN users u ON r.user_id = u.id";
+          whereClause = "u.admin_id = ?";
+          queryParams.unshift(userId);
+          countParams.unshift(userId);
+          break;
+        case "user":
+          whereClause = "r.user_id = ?";
+          queryParams.unshift(userId);
+          countParams.unshift(userId);
+          break;
+        default:
+          throw new Error("Invalid role");
       }
 
-      const query = `
+      // SQL Queries
+      const selectQuery = `
         SELECT r.*
         FROM records r
         ${joinClause}
@@ -349,11 +430,19 @@ exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") 
         WHERE ${whereClause} ${searchClause}
       `;
 
-      const [countRows] = await conn.execute(countQuery, countParams);
-      const total = countRows[0].total;
+      // Add pagination params at the end
+      const finalQueryParams = [...queryParams, limit, offset];
 
-      params.push(limit, offset);
-      const [rows] = await conn.execute(query, params);
+      // Optional: Debug
+      // console.log("Executing:", selectQuery);
+      // console.log("With Params:", finalQueryParams);
+
+      // Execute count
+      const [countRows] = await conn.execute(countQuery, countParams);
+      const total = countRows[0]?.total || 0;
+
+      // Execute data query
+      const [rows] = await conn.execute(selectQuery, finalQueryParams);
 
       return {
         data: rows,
