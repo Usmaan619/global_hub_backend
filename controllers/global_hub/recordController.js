@@ -14,9 +14,16 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search || "";
+
     const record = await recordModel.getAllRecords(
       req?.query.id,
-      req?.query.role
+      req?.query.role,
+      page,
+      limit,
+      search
     );
     res.json({ success: true, record });
   } catch (error) {

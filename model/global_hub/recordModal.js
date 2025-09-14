@@ -192,45 +192,45 @@ exports.deleteRecord = async (id) => {
     throw new Error("Database error while deleting record");
   }
 };
-exports.getAllRecords = async (userId, role) => {
-  try {
-    return await withConnection(async (conn) => {
-      let query = "";
-      let params = [];
+// exports.getAllRecords = async (userId, role) => {
+//   try {
+//     return await withConnection(async (conn) => {
+//       let query = "";
+//       let params = [];
 
-      if (role === "superadmin") {
-        // Superadmin gets all records
-        query = `SELECT * FROM records ORDER BY id DESC`;
-      } else if (role === "admin") {
-        // Admin gets records of users under them
-        query = `
-          SELECT r.*
-          FROM records r
-          JOIN users u ON r.user_id = u.id
-          WHERE u.admin_id = ?
-          ORDER BY r.id DESC
-        `;
-        params = [userId];
-      } else if (role === "user") {
-        // Normal user gets only their own records
-        query = `
-          SELECT * FROM records
-          WHERE user_id = ?
-          ORDER BY id DESC
-        `;
-        params = [userId];
-      } else {
-        throw new Error("Invalid role");
-      }
+//       if (role === "superadmin") {
+//         // Superadmin gets all records
+//         query = `SELECT * FROM records ORDER BY id DESC`;
+//       } else if (role === "admin") {
+//         // Admin gets records of users under them
+//         query = `
+//           SELECT r.*
+//           FROM records r
+//           JOIN users u ON r.user_id = u.id
+//           WHERE u.admin_id = ?
+//           ORDER BY r.id DESC
+//         `;
+//         params = [userId];
+//       } else if (role === "user") {
+//         // Normal user gets only their own records
+//         query = `
+//           SELECT * FROM records
+//           WHERE user_id = ?
+//           ORDER BY id DESC
+//         `;
+//         params = [userId];
+//       } else {
+//         throw new Error("Invalid role");
+//       }
 
-      const [rows] = await conn.execute(query, params);
-      return rows;
-    });
-  } catch (error) {
-    console.error("Model:getAllRecords Error:", error);
-    throw new Error("Database error while fetching records");
-  }
-};
+//       const [rows] = await conn.execute(query, params);
+//       return rows;
+//     });
+//   } catch (error) {
+//     console.error("Model:getAllRecords Error:", error);
+//     throw new Error("Database error while fetching records");
+//   }
+// };
 
 exports.deleteRecordsByUserId = async (userId) => {
   try {
@@ -248,5 +248,122 @@ exports.deleteRecordsByUserId = async (userId) => {
       moment().format()
     );
     throw new Error("Database error while deleting user's records");
+  }
+};
+
+// exports.getAllRecords = async (userId, role, page = 1, limit = 10) => {
+//   try {
+//     return await withConnection(async (conn) => {
+//       let query = "";
+//       let params = [];
+
+//       // Calculate offset
+//       const offset = (page - 1) * limit;
+
+//       if (role === "superadmin") {
+//         // Superadmin gets all records
+//         query = `
+//           SELECT * FROM records
+//           ORDER BY id DESC
+//           LIMIT ? OFFSET ?
+//         `;
+//         params = [limit, offset];
+//       } else if (role === "admin") {
+//         // Admin gets records of users under them
+//         query = `
+//           SELECT r.*
+//           FROM records r
+//           JOIN users u ON r.user_id = u.id
+//           WHERE u.admin_id = ?
+//           ORDER BY r.id DESC
+//           LIMIT ? OFFSET ?
+//         `;
+//         params = [userId, limit, offset];
+//       } else if (role === "user") {
+//         // Normal user gets only their own records
+//         query = `
+//           SELECT * FROM records
+//           WHERE user_id = ?
+//           ORDER BY id DESC
+//           LIMIT ? OFFSET ?
+//         `;
+//         params = [userId, limit, offset];
+//       } else {
+//         throw new Error("Invalid role");
+//       }
+
+//       const [rows] = await conn.execute(query, params);
+//       return rows;
+//     });
+//   } catch (error) {
+//     console.error("Model:getAllRecords Error:", error);
+//     throw new Error("Database error while fetching records");
+//   }
+// };
+exports.getAllRecords = async (userId, role, page = 1, limit = 10, search = "") => {
+  try {
+    return await withConnection(async (conn) => {
+      let whereClause = "";
+      let joinClause = "";
+      let params = [];
+      let countParams = [];
+
+      const offset = (page - 1) * limit;
+
+      // Add search filter (optional)
+      let searchClause = "";
+      if (search) {
+        searchClause = ` AND r.record_no LIKE ?`;
+        params.push(`%${search}%`);
+        countParams.push(`%${search}%`);
+      }
+
+      if (role === "superadmin") {
+        whereClause = "1";
+      } else if (role === "admin") {
+        joinClause = "JOIN users u ON r.user_id = u.id";
+        whereClause = "u.admin_id = ?";
+        params.unshift(userId); // for both SELECT and COUNT
+        countParams.unshift(userId);
+      } else if (role === "user") {
+        whereClause = "r.user_id = ?";
+        params.unshift(userId);
+        countParams.unshift(userId);
+      } else {
+        throw new Error("Invalid role");
+      }
+
+      const query = `
+        SELECT r.*
+        FROM records r
+        ${joinClause}
+        WHERE ${whereClause} ${searchClause}
+        ORDER BY r.id DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM records r
+        ${joinClause}
+        WHERE ${whereClause} ${searchClause}
+      `;
+
+      const [countRows] = await conn.execute(countQuery, countParams);
+      const total = countRows[0].total;
+
+      params.push(limit, offset);
+      const [rows] = await conn.execute(query, params);
+
+      return {
+        data: rows,
+        total,
+        page,
+        limit,
+      };
+    });
+  } catch (error) {
+    console.error("Model:getAllRecords Error:", error);
+    throw new Error("Database error while fetching records");
   }
 };

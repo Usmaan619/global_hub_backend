@@ -83,7 +83,7 @@ exports.getUsersByRoleAndId = async (req, res) => {
     const user = await adminModel.getUsersByRoleAndId(role, id);
     return res
       .status(201)
-      .json({ message: "Admin created successfully", success: true, user });
+      .json({ message: "successfully", success: true, user });
   } catch (error) {
     console.error("Controller:createAdmin Error:", error, moment().format());
     return res.status(500).json({
