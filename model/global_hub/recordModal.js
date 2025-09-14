@@ -265,9 +265,9 @@ exports.getAllRecords = async (
       let params = [];
       let countParams = [];
 
-      const offset = (page - 1) * limit;
+      const offset = (Number(page) - 1) * Number(limit);
 
-      // Add search filter (optional)
+      // Add search filter
       let searchClause = "";
       if (search) {
         searchClause = ` AND r.record_no LIKE ?`;
@@ -275,16 +275,17 @@ exports.getAllRecords = async (
         countParams.push(`%${search}%`);
       }
 
+      // Role-based filters
       if (role === "superadmin") {
-        whereClause = "1";
+        whereClause = "1"; // no user restriction
       } else if (role === "admin") {
         joinClause = "JOIN users u ON r.user_id = u.id";
         whereClause = "u.admin_id = ?";
-        params.unshift(userId); // for both SELECT and COUNT
+        params.unshift(userId); // add to start
         countParams.unshift(userId);
       } else if (role === "user") {
         whereClause = "r.user_id = ?";
-        params.unshift(userId);
+        params.unshift(userId); // add to start
         countParams.unshift(userId);
       } else {
         throw new Error("Invalid role");
@@ -306,17 +307,26 @@ exports.getAllRecords = async (
         WHERE ${whereClause} ${searchClause}
       `;
 
+      // Log queries and params (for debugging)
+      console.log("Executing countQuery:", countQuery);
+      console.log("Count Params:", countParams);
+
       const [countRows] = await conn.execute(countQuery, countParams);
       const total = countRows[0].total;
 
-      params.push(limit, offset);
+      // Add limit and offset to query params
+      params.push(Number(limit), Number(offset));
+
+      console.log("Executing query:", query);
+      console.log("Query Params:", params);
+
       const [rows] = await conn.execute(query, params);
 
       return {
         data: rows,
         total,
-        page,
-        limit,
+        page: Number(page),
+        limit: Number(limit),
       };
     });
   } catch (error) {
