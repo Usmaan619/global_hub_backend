@@ -3,57 +3,57 @@ const moment = require("moment");
 const { withConnection } = require("../../utils/helper");
 const axios = require("axios");
 
-// exports.createRecord = async (req, res) => {
-//   try {
-//     const id = await recordModel.createRecord(req?.body);
-//     res.status(201).json({ message: " created", id });
-//   } catch (error) {
-//     console.error("Controller:createRecord Error:", error, moment().format());
-//     res.status(500).json({ message: "Server error while creating record" });
-//   }
-// };
-
 exports.createRecord = async (req, res) => {
   try {
-    const { recaptcha_token } = req.body;
-    console.log("req.body: ", req.body);
-    console.log("recaptchaToken: ", recaptcha_token);
-
-    // Step 1: reCAPTCHA verification
-    let score = "";
-    if (recaptcha_token) {
-      const verifyUrl = "https://www.google.com/recaptcha/api/siteverify";
-      const params = new URLSearchParams();
-      params.append("secret", "6LdLof0rAAAAAD5JnaDbHzl4F6PbA6-tgqoJaJh-"); // Replace with your secret key
-      params.append("response", recaptcha_token);
-
-      const { data: result } = await axios.post(verifyUrl, params);
-      console.log("result: ", result);
-      score = result.score
-      if (!result.success || (result.score && result.score < 0.5)) {
-        return res.status(403).json({
-          success: false,
-          message: "reCAPTCHA verification failed",
-          verified: false,
-          data: result,
-        });
-      }
-    }
-
-    //  Step 2: Record save to DB
-    const id = await recordModel.createRecord(req.body);
-
-    return res.status(201).json({
-      message: "Record created successfully",
-      id,
-      verified: recaptcha_token ? true : false, // frontend ko batata hai captcha hua ya nahi
-      score,
-    });
+    const id = await recordModel.createRecord(req?.body);
+    res.status(201).json({ message: " created", id });
   } catch (error) {
     console.error("Controller:createRecord Error:", error, moment().format());
     res.status(500).json({ message: "Server error while creating record" });
   }
 };
+
+// exports.createRecord = async (req, res) => {
+//   try {
+//     const { recaptcha_token } = req.body;
+//     console.log("req.body: ", req.body);
+//     console.log("recaptchaToken: ", recaptcha_token);
+
+//     // Step 1: reCAPTCHA verification
+//     let score = "";
+//     if (recaptcha_token) {
+//       const verifyUrl = "https://www.google.com/recaptcha/api/siteverify";
+//       const params = new URLSearchParams();
+//       params.append("secret", "6LdLof0rAAAAAD5JnaDbHzl4F6PbA6-tgqoJaJh-"); // Replace with your secret key
+//       params.append("response", recaptcha_token);
+
+//       const { data: result } = await axios.post(verifyUrl, params);
+//       console.log("result: ", result);
+//       score = result.score
+//       if (!result.success || (result.score && result.score < 0.5)) {
+//         return res.status(403).json({
+//           success: false,
+//           message: "reCAPTCHA verification failed",
+//           verified: false,
+//           data: result,
+//         });
+//       }
+//     }
+
+//     //  Step 2: Record save to DB
+//     const id = await recordModel.createRecord(req.body);
+
+//     return res.status(201).json({
+//       message: "Record created successfully",
+//       id,
+//       verified: recaptcha_token ? true : false, // frontend ko batata hai captcha hua ya nahi
+//       score,
+//     });
+//   } catch (error) {
+//     console.error("Controller:createRecord Error:", error, moment().format());
+//     res.status(500).json({ message: "Server error while creating record" });
+//   }
+// };
 
 exports.getAllRecords = async (req, res) => {
   try {
