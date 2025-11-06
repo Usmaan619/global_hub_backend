@@ -1,8 +1,8 @@
-const bcrypt = require("bcrypt");
 const authModel = require("../../model/global_hub/authModel");
 const moment = require("moment");
 const { generateToken, withConnection } = require("../../utils/helper");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const { v4: uuidv4 } = require("uuid");
 
@@ -50,79 +50,79 @@ const roles = [
   { role: "user", table: "users", hash: false },
 ];
 
-exports.loginAutoDetect = async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password)
-    return res.status(400).json({ message: "Username and password required" });
+// exports.loginAutoDetect = async (req, res) => {
+//   const { username, password } = req.body;
+//   if (!username || !password)
+//     return res.status(400).json({ message: "Username and password required" });
 
-  try {
-    let matchedUser = null;
-    let detectedRole = null;
-    const session = uuidv4();
+//   try {
+//     let matchedUser = null;
+//     let detectedRole = null;
+//     const session = uuidv4();
 
-    for (const { role, table, hash } of roles) {
-      const user = await withConnection(async (conn) => {
-        const query = `SELECT * FROM ${table} WHERE username = ?`;
-        const [rows] = await conn.execute(query, [username]);
-        return rows[0];
-      });
+//     for (const { role, table, hash } of roles) {
+//       const user = await withConnection(async (conn) => {
+//         const query = `SELECT * FROM ${table} WHERE username = ?`;
+//         const [rows] = await conn.execute(query, [username]);
+//         return rows[0];
+//       });
 
-      if (user) {
-        const valid = hash
-          ? await bcrypt.compare(password, user.password)
-          : password === user.password;
+//       if (user) {
+//         const valid = hash
+//           ? await bcrypt.compare(password, user.password)
+//           : password === user.password;
 
-        if (valid) {
-          matchedUser = user;
-          detectedRole = role;
+//         if (valid) {
+//           matchedUser = user;
+//           detectedRole = role;
 
-          const update = await withConnection(async (conn) => {
-            /**
-             * Update session for the user in the database
-             * @param {string} table - The table name where the user is stored
-             * @param {string} username - The username of the user
-             * @returns {Promise<Object>} - The updated user object
-             */
+//           const update = await withConnection(async (conn) => {
+//             /**
+//              * Update session for the user in the database
+//              * @param {string} table - The table name where the user is stored
+//              * @param {string} username - The username of the user
+//              * @returns {Promise<Object>} - The updated user object
+//              */
 
-            const query = `UPDATE ${table} SET session = ? WHERE username = ?`;
-            const [result] = await conn.execute(query, [session, username]);
-            return result?.affectedRows > 0 ? { ...user, session } : null;
-          });
+//             const query = `UPDATE ${table} SET session = ? WHERE username = ?`;
+//             const [result] = await conn.execute(query, [session, username]);
+//             return result?.affectedRows > 0 ? { ...user, session } : null;
+//           });
 
-          break; // stop at first valid match
-        }
-      }
-    }
+//           break; // stop at first valid match
+//         }
+//       }
+//     }
 
-    if (!matchedUser) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid username or password" });
-    }
+//     if (!matchedUser) {
+//       return res
+//         .status(401)
+//         .json({ success: false, message: "Invalid username or password" });
+//     }
 
-    const token = jwt.sign(
-      { id: matchedUser.id, role: detectedRole },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" }
-    );
+//     const token = jwt.sign(
+//       { id: matchedUser.id, role: detectedRole },
+//       process.env.JWT_SECRET,
+//       { expiresIn: "30d" }
+//     );
 
-    res.json({
-      success: true,
-      message: "Login successful",
-      role: detectedRole,
-      user: matchedUser,
-      token,
-      session,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: err.message,
-    });
-  }
-};
+//     res.json({
+//       success: true,
+//       message: "Login successful",
+//       role: detectedRole,
+//       user: matchedUser,
+//       token,
+//       session,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: err.message,
+//     });
+//   }
+// };
 
 // exports.registerAutoDetect = async (req, res) => {
 //   const { role, name, username, password, admin_id } = req.body;
@@ -360,6 +360,129 @@ exports.loginAutoDetect = async (req, res) => {
 //       .json({ success: false, message: "Server error", error: err.message });
 //   }
 // };
+
+/**
+ *  Universal Login API (with Lock Check)
+ * Detects role, validates credentials, ensures account is not locked,
+ * and returns JWT + session.
+ */
+exports.loginAutoDetect = async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Username and password are required." });
+  }
+
+  try {
+    let matchedUser = null;
+    let detectedRole = null;
+    let tableName = null;
+    const session = uuidv4();
+
+    // Try to match user across all roles
+    for (const { role, table, hash } of roles) {
+      const user = await withConnection(async (conn) => {
+        const [rows] = await conn.execute(
+          `SELECT * FROM ${table} WHERE username = ? LIMIT 1`,
+          [username]
+        );
+        return rows[0];
+      });
+
+      if (user) {
+        const valid = hash
+          ? await bcrypt.compare(password, user.password)
+          : password === user.password;
+
+        if (valid) {
+          matchedUser = user;
+          detectedRole = role;
+          tableName = table;
+          break;
+        }
+      }
+    }
+
+    // No match found
+    if (!matchedUser) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid username or password." });
+    }
+
+    // 🔒 Check if account is locked (except for superadmin)
+    if (detectedRole !== "superadmin") {
+      const isLocked = matchedUser.is_locked === 1;
+
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: `${
+            detectedRole.charAt(0).toUpperCase() + detectedRole.slice(1)
+          } account is locked. Please contact your administrator.`,
+        });
+      }
+
+      // Additional check: If user → check their admin’s lock status
+      if (detectedRole === "user" && matchedUser.admin_id) {
+        const adminLocked = await withConnection(async (conn) => {
+          const [rows] = await conn.execute(
+            "SELECT is_locked FROM admins WHERE id = ?",
+            [matchedUser.admin_id]
+          );
+          return rows[0]?.is_locked === 1;
+        });
+
+        if (adminLocked) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Access denied — your admin has locked the portal. Please contact your admin.",
+          });
+        }
+      }
+    }
+
+    //  Update session
+    await withConnection(async (conn) => {
+      await conn.execute(
+        `UPDATE ${tableName} SET session = ? WHERE username = ?`,
+        [session, username]
+      );
+    });
+
+    //  Generate JWT
+    const token = jwt.sign(
+      { id: matchedUser.id, role: detectedRole },
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+
+    //  Response
+    res.status(200).json({
+      success: true,
+      message: `${detectedRole.toUpperCase()} login successful.`,
+      role: detectedRole,
+      user: {
+        id: matchedUser.id,
+        username: matchedUser.username,
+        name: matchedUser.name || null,
+        email: matchedUser.email || null,
+      },
+      token,
+      session,
+    });
+  } catch (error) {
+    console.error(" Login Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
 
 exports.registerAutoDetect = async (req, res) => {
   const { role, name, username, password, admin_id, user_limit, created_by } =

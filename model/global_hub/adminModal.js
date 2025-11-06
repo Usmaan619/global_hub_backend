@@ -482,6 +482,7 @@ exports.getUsersByRoleAndId = async (role, id = null) => {
               username: admin.username,
               admin_created_at: admin.created_at,
               user_limit: admin?.user_limit,
+              is_locked: admin?.is_locked,
               role_name: admin?.role,
               admin_password: admin.password,
               user_count: users.length,

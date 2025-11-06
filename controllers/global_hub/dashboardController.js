@@ -625,44 +625,118 @@ exports.getLockStatusToggle = async (req, res) => {
   }
 };
 
-// app.post('/api/add-record', async (req, res) => {
-//   try {
-//     const result = await withConnection(async (connection) => {
-//       const [rows] = await connection.query(
-//         "SELECT value FROM settings WHERE key_name = 'data_entry_disabled' LIMIT 1"
-//       );
 
-//       const disabled = rows.length > 0 && rows[0].value === 'true';
 
-//       if ((req.user.role === 'admin' || req.user.role === 'user') && disabled) {
-//         return { blocked: true };
-//       }
 
-//       const { data } = req.body;
-//       if (!data) {
-//         return { error: 'Missing required field: data' };
-//       }
 
-//       await connection.query(
-//         "INSERT INTO records (data) VALUES (?)",
-//         [data]
-//       );
 
-//       return { success: true };
-//     });
 
-//     if (result.blocked) {
-//       return res.status(403).json({ error: 'Data entry is disabled by Superadmin' });
-//     }
 
-//     if (result.error) {
-//       return res.status(400).json({ error: result.error });
-//     }
+/**
+ *  Lock or Unlock an Admin and All Its Users
+ * - When an admin is locked/unlocked, all users under that admin are also locked/unlocked.
+ */
+exports.adminLockWithAllUsers = async (req, res) => {
+  const { id } = req.params;
+  const { is_locked } = req.body;
 
-//     res.json({ success: true });
+  if (!id || typeof is_locked === "undefined") {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Admin ID and is_locked are required.",
+      });
+  }
 
-//   } catch (error) {
-//     console.error('Error adding record:', error);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// });
+  const lockValue = Number(is_locked) === 1 ? 1 : 0;
+
+  try {
+    await withConnection(async (connection) => {
+      // Step 1: Check if admin exists
+      const [admin] = await connection.query(
+        "SELECT id FROM admins WHERE id = ?",
+        [id]
+      );
+      if (admin.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Admin not found.",
+        });
+      }
+
+      // Step 2: Update Admin
+      await connection.query("UPDATE admins SET is_locked = ? WHERE id = ?", [
+        lockValue,
+        id,
+      ]);
+
+      // Step 3: Update All Users under Admin
+      await connection.query(
+        "UPDATE users SET is_locked = ? WHERE admin_id = ?",
+        [lockValue, id]
+      );
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        lockValue === 1
+          ? "Admin and all associated users locked successfully."
+          : "Admin and all associated users unlocked successfully.",
+    });
+  } catch (error) {
+    console.error(" Error in adminLockWithAllUsers:", error);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
+/**
+ *  Lock or Unlock a Single User (without affecting admin)
+ */
+exports.usersLock = async (req, res) => {
+  const { id } = req.params;
+  const { is_locked } = req.body;
+
+  if (!id || typeof is_locked === "undefined") {
+    return res
+      .status(400)
+      .json({ success: false, message: "User ID and is_locked are required." });
+  }
+
+  const lockValue = Number(is_locked) === 1 ? 1 : 0;
+
+  try {
+    await withConnection(async (connection) => {
+      // Step 1: Check if User Exists
+      const [user] = await connection.query(
+        "SELECT id FROM users WHERE id = ?",
+        [id]
+      );
+      if (user.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found.",
+        });
+      }
+
+      // Step 2: Update User Lock Status
+      await connection.query("UPDATE users SET is_locked = ? WHERE id = ?", [
+        lockValue,
+        id,
+      ]);
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        lockValue === 1
+          ? `User (ID: ${id}) locked successfully.`
+          : `User (ID: ${id}) unlocked successfully.`,
+    });
+  } catch (error) {
+    console.error(" Error in usersLock:", error);
+    res.status(500).json({ success: false, message: "Internal server error." });
+  }
+};
+
