@@ -57,23 +57,39 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || "";
+    const {
+      id,        // adminId OR userId
+      role,
+      scope,     // 👈 NEW (all | userId)
+      page = 1,
+      limit = 10,
+      search = "",
+    } = req.query;
+
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
 
     const record = await recordModel.getAllRecords(
-      req?.query.id,
-      req?.query.role,
-      page,
-      limit,
+      id,
+      role,
+      scope,          // 👈 pass scope
+      Number(page),
+      Number(limit),
       search
     );
+
     res.json({ success: true, record });
   } catch (error) {
-    console.error("Controller:getAllRecords Error:", error, moment().format());
-    res.status(500).json({ message: "Server error while fetching records" });
+    console.error("Controller:getAllRecords", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch records",
+    });
   }
 };
+
+
 
 exports.updateRecord = async (req, res) => {
   try {

@@ -252,85 +252,203 @@ exports.deleteRecordsByUserId = async (userId) => {
 };
 
 // model/global_hub/recordModal.js
+// exports.getAllRecords = async (
+//   userId,
+//   role,
+//   page = 1,
+//   limit = 10,
+//   search = ""
+// ) => {
+//   try {
+//     return await withConnection(async (conn) => {
+//       let whereClause = "";
+//       let joinClause = "";
+//       let params = [];
+//       let countParams = [];
+
+//       // Validate pagination inputs
+//       const safePage = Math.max(1, Number(page) || 1);
+//       const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 10)); // cap if needed
+//       const offset = (safePage - 1) * safeLimit;
+
+//       // Search filter
+//       let searchClause = "";
+//       if (search && String(search).trim() !== "") {
+//         searchClause = ` AND r.record_no LIKE ?`;
+//         params.push(`%${search}%`);
+//         countParams.push(`%${search}%`);
+//       }
+
+//       // Role-based filters
+//       // if (role === "superadmin") {
+//       //   whereClause = "1";
+//       // } else if (role === "admin") {
+//       //   joinClause = "JOIN users u ON r.user_id = u.id";
+//       //   whereClause = "u.admin_id = ?";
+//       //   params.unshift(userId); // first in params
+//       //   countParams.unshift(userId);
+//       // } else if (role === "user") {
+//       //   whereClause = "r.user_id = ?";
+//       //   const uid = Number(userId) || userId; // keep compatibility if column is VARCHAR
+//       //   params.unshift(uid);
+//       //   countParams.unshift(uid);
+//       // } else {
+//       //   throw new Error("Invalid role");
+//       // }
+
+//       // Role-based filters
+//       if (role === "superadmin") {
+//         whereClause = "1";
+//       } else if (role === "admin") {
+//         if (userId === "all" || !userId) {
+//           // Admin ke saare users (existing logic)
+//           joinClause = "JOIN users u ON r.user_id = u.id";
+//           whereClause = "u.admin_id = ?";
+//           params.unshift(userId); // admin_id
+//           countParams.unshift(userId);
+//         } else {
+//           // Specific user select kiya hai dropdown se
+//           whereClause = "r.user_id = ?";
+//           params.unshift(userId); // specific user_id
+//           countParams.unshift(userId);
+//         }
+//       } else if (role === "user") {
+//         whereClause = "r.user_id = ?";
+//         const uid = Number(userId) || userId;
+//         params.unshift(uid);
+//         countParams.unshift(uid);
+//       }
+
+//       const query = `
+//         SELECT r.*
+//         FROM records r
+//         ${joinClause}
+//         WHERE ${whereClause} ${searchClause}
+//         ORDER BY r.id DESC
+//         LIMIT ? OFFSET ?
+//       `;
+
+//       const countQuery = `
+//         SELECT COUNT(*) as total
+//         FROM records r
+//         ${joinClause}
+//         WHERE ${whereClause} ${searchClause}
+//       `;
+
+//       // Count first (execute is fine)
+//       console.log("Executing countQuery:", countQuery);
+//       console.log("Count Params:", countParams);
+//       const [countRows] = await conn.execute(countQuery, countParams);
+//       const total = Number(countRows?.[0]?.total || 0);
+
+//       // Data query params
+//       params.push(safeLimit, offset);
+//       console.log("Executing query:", query);
+//       console.log("Query Params:", params);
+
+//       // Robust fix: use query() for data rows to avoid ER_WRONG_ARGUMENTS on LIMIT/OFFSET
+//       const [rows] = await conn.query(query, params);
+
+//       // Alternative fix (if you prefer execute): stringify the LIMIT/OFFSET
+//       // const fixedParams = [...params];
+//       // fixedParams[fixedParams.length - 2] = String(safeLimit);
+//       // fixedParams[fixedParams.length - 1] = String(offset);
+//       // const [rows] = await conn.execute(query, fixedParams);
+
+//       return {
+//         data: rows,
+//         total,
+//         page: safePage,
+//         limit: safeLimit,
+//       };
+//     });
+//   } catch (error) {
+//     console.error("Model:getAllRecords Error:", error);
+//     throw new Error("Database error while fetching records");
+//   }
+// };
 exports.getAllRecords = async (
-  userId,
+  contextId, // adminId OR userId
   role,
+  scope,     // "all" | userId | undefined
   page = 1,
   limit = 10,
   search = ""
 ) => {
   try {
     return await withConnection(async (conn) => {
-      let whereClause = "";
-      let joinClause = "";
-      let params = [];
-      let countParams = [];
-
-      // Validate pagination inputs
       const safePage = Math.max(1, Number(page) || 1);
-      const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 10)); // cap if needed
+      const safeLimit = Math.min(100, Math.max(1, Number(limit) || 10));
       const offset = (safePage - 1) * safeLimit;
 
-      // Search filter
-      let searchClause = "";
-      if (search && String(search).trim() !== "") {
-        searchClause = ` AND r.record_no LIKE ?`;
+      const joins = [];
+      const conditions = [];
+      const params = [];
+
+      /* ================= SEARCH ================= */
+      if (search?.trim()) {
+        conditions.push("r.record_no LIKE ?");
         params.push(`%${search}%`);
-        countParams.push(`%${search}%`);
       }
 
-      // Role-based filters
-      if (role === "superadmin") {
-        whereClause = "1";
-      } else if (role === "admin") {
-        joinClause = "JOIN users u ON r.user_id = u.id";
-        whereClause = "u.admin_id = ?";
-        params.unshift(userId); // first in params
-        countParams.unshift(userId);
-      } else if (role === "user") {
-        whereClause = "r.user_id = ?";
-        const uid = Number(userId) || userId; // keep compatibility if column is VARCHAR
-        params.unshift(uid);
-        countParams.unshift(uid);
-      } else {
-        throw new Error("Invalid role");
+      /* ================= ROLE LOGIC ================= */
+      switch (role) {
+        case "superadmin":
+          conditions.push("1=1");
+          break;
+
+        case "admin":
+          joins.push("JOIN users u ON u.id = r.user_id");
+
+          // 👇 ADMIN → ALL USERS
+          if (scope === "all" || !scope) {
+            conditions.push("u.admin_id = ?");
+            params.push(Number(contextId)); // ✅ adminId
+          }
+          // 👇 ADMIN → SINGLE USER
+          else {
+            conditions.push("r.user_id = ?");
+            params.push(Number(scope)); // ✅ userId
+          }
+          break;
+
+        case "user":
+          conditions.push("r.user_id = ?");
+          params.push(Number(contextId));
+          break;
+
+        default:
+          throw new Error("Invalid role");
       }
 
-      const query = `
+      const whereSQL = conditions.length
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
+
+      const joinSQL = joins.join(" ");
+
+      /* ================= COUNT ================= */
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM records r
+        ${joinSQL}
+        ${whereSQL}
+      `;
+
+      const [[{ total }]] = await conn.execute(countQuery, params);
+
+      /* ================= DATA ================= */
+      const dataQuery = `
         SELECT r.*
         FROM records r
-        ${joinClause}
-        WHERE ${whereClause} ${searchClause}
+        ${joinSQL}
+        ${whereSQL}
         ORDER BY r.id DESC
         LIMIT ? OFFSET ?
       `;
 
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM records r
-        ${joinClause}
-        WHERE ${whereClause} ${searchClause}
-      `;
-
-      // Count first (execute is fine)
-      console.log("Executing countQuery:", countQuery);
-      console.log("Count Params:", countParams);
-      const [countRows] = await conn.execute(countQuery, countParams);
-      const total = Number(countRows?.[0]?.total || 0);
-
-      // Data query params
-      params.push(safeLimit, offset);
-      console.log("Executing query:", query);
-      console.log("Query Params:", params);
-
-      // Robust fix: use query() for data rows to avoid ER_WRONG_ARGUMENTS on LIMIT/OFFSET
-      const [rows] = await conn.query(query, params);
-
-      // Alternative fix (if you prefer execute): stringify the LIMIT/OFFSET
-      // const fixedParams = [...params];
-      // fixedParams[fixedParams.length - 2] = String(safeLimit);
-      // fixedParams[fixedParams.length - 1] = String(offset);
-      // const [rows] = await conn.execute(query, fixedParams);
+      const dataParams = [...params, safeLimit, offset];
+      const [rows] = await conn.execute(dataQuery, dataParams);
 
       return {
         data: rows,
@@ -339,8 +457,9 @@ exports.getAllRecords = async (
         limit: safeLimit,
       };
     });
-  } catch (error) {
-    console.error("Model:getAllRecords Error:", error);
-    throw new Error("Database error while fetching records");
+  } catch (err) {
+    console.error("Model:getAllRecords", err);
+    throw err;
   }
 };
+
