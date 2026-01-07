@@ -368,9 +368,9 @@ exports.deleteRecordsByUserId = async (userId) => {
 //   }
 // };
 exports.getAllRecords = async (
-  contextId, // adminId OR userId
+  contextId,
   role,
-  scope,     // "all" | userId | undefined
+  scope,
   page = 1,
   limit = 10,
   search = ""
@@ -394,21 +394,18 @@ exports.getAllRecords = async (
       /* ================= ROLE LOGIC ================= */
       switch (role) {
         case "superadmin":
-          conditions.push("1=1");
+          // ❌ 1=1 ki zarurat hi nahi
           break;
 
         case "admin":
           joins.push("JOIN users u ON u.id = r.user_id");
 
-          // 👇 ADMIN → ALL USERS
           if (scope === "all" || !scope) {
             conditions.push("u.admin_id = ?");
-            params.push(Number(contextId)); // ✅ adminId
-          }
-          // 👇 ADMIN → SINGLE USER
-          else {
+            params.push(Number(contextId));
+          } else {
             conditions.push("r.user_id = ?");
-            params.push(Number(scope)); // ✅ userId
+            params.push(Number(scope));
           }
           break;
 
@@ -462,4 +459,5 @@ exports.getAllRecords = async (
     throw err;
   }
 };
+
 
