@@ -377,8 +377,10 @@ exports.getAllRecords = async (
 ) => {
   try {
     return await withConnection(async (conn) => {
-      const safePage = Math.max(1, Number(page) || 1);
-      const safeLimit = Math.min(100, Math.max(1, Number(limit) || 10));
+      const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+      const safeLimit =
+        Number.isInteger(limit) && limit > 0 && limit <= 100 ? limit : 10;
+
       const offset = (safePage - 1) * safeLimit;
 
       const joins = [];
@@ -459,5 +461,3 @@ exports.getAllRecords = async (
     throw err;
   }
 };
-
-

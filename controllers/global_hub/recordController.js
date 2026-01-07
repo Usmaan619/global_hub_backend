@@ -57,12 +57,12 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
-    const {
-      id,        // adminId OR userId
+    let {
+      id,
       role,
-      scope,     // 👈 NEW (all | userId)
-      page = 1,
-      limit = 10,
+      scope,
+      page,
+      limit,
       search = "",
     } = req.query;
 
@@ -70,12 +70,18 @@ exports.getAllRecords = async (req, res) => {
       return res.status(400).json({ message: "Role is required" });
     }
 
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
+
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(limit) || limit < 1) limit = 10;
+
     const record = await recordModel.getAllRecords(
       id,
       role,
-      scope,          // 👈 pass scope
-      Number(page),
-      Number(limit),
+      scope,
+      page,
+      limit,
       search
     );
 
