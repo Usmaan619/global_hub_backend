@@ -380,7 +380,6 @@ exports.getAllRecords = async (
       const safePage = Number.isInteger(page) && page > 0 ? page : 1;
       const safeLimit =
         Number.isInteger(limit) && limit > 0 && limit <= 100 ? limit : 10;
-
       const offset = (safePage - 1) * safeLimit;
 
       const joins = [];
@@ -396,7 +395,6 @@ exports.getAllRecords = async (
       /* ================= ROLE LOGIC ================= */
       switch (role) {
         case "superadmin":
-          // ❌ 1=1 ki zarurat hi nahi
           break;
 
         case "admin":
@@ -437,17 +435,17 @@ exports.getAllRecords = async (
       const [[{ total }]] = await conn.execute(countQuery, params);
 
       /* ================= DATA ================= */
+      // ⚠️ MariaDB FIX: LIMIT/OFFSET inline
       const dataQuery = `
         SELECT r.*
         FROM records r
         ${joinSQL}
         ${whereSQL}
         ORDER BY r.id DESC
-        LIMIT ? OFFSET ?
+        LIMIT ${safeLimit} OFFSET ${offset}
       `;
 
-      const dataParams = [...params, safeLimit, offset];
-      const [rows] = await conn.execute(dataQuery, dataParams);
+      const [rows] = await conn.execute(dataQuery, params);
 
       return {
         data: rows,
@@ -461,3 +459,4 @@ exports.getAllRecords = async (
     throw err;
   }
 };
+
