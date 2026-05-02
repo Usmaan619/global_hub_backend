@@ -68,6 +68,17 @@ const moment = require("moment");
 exports.createRecord = async (data) => {
   try {
     return await withConnection(async (conn) => {
+      // Check if record_no already exists
+      if (data.record_no) {
+        const [existing] = await conn.execute(
+          "SELECT id FROM records WHERE record_no = ?",
+          [data.record_no]
+        );
+        if (existing && existing.length > 0) {
+          throw new Error("Record Number already exists");
+        }
+      }
+
       const query = `
         INSERT INTO records (
           user_id, admin_id, record_no, lead_no, applicant_first_name,
@@ -127,7 +138,7 @@ exports.createRecord = async (data) => {
     });
   } catch (error) {
     console.error("Model:createRecord Error:", error, moment().format());
-    throw new Error("Database error while creating record");
+    throw error;
   }
 };
 
