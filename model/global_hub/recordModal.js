@@ -68,6 +68,17 @@ const moment = require("moment");
 exports.createRecord = async (data) => {
   try {
     return await withConnection(async (conn) => {
+      // // Check if record_no already exists
+      // if (data.record_no) {
+      //   const [existing] = await conn.execute(
+      //     "SELECT id FROM records WHERE record_no = ?",
+      //     [data.record_no]
+      //   );
+      //   if (existing && existing.length > 0) {
+      //     throw new Error("Record Number already exists");
+      //   }
+      // }
+
       const query = `
         INSERT INTO records (
           user_id, admin_id, record_no, lead_no, applicant_first_name,
@@ -237,7 +248,7 @@ exports.deleteRecordsByUserId = async (userId) => {
     return await withConnection(async (conn) => {
       const [result] = await conn.execute(
         "DELETE FROM records WHERE user_id = ?",
-        [userId]
+        [userId],
       );
       return result?.affectedRows > 0;
     });
@@ -245,7 +256,7 @@ exports.deleteRecordsByUserId = async (userId) => {
     console.error(
       "Model:deleteRecordsByUserId Error:",
       error,
-      moment().format()
+      moment().format(),
     );
     throw new Error("Database error while deleting user's records");
   }
@@ -373,7 +384,7 @@ exports.getAllRecords = async (
   scope,
   page = 1,
   limit = 10,
-  search = ""
+  search = "",
 ) => {
   try {
     return await withConnection(async (conn) => {
@@ -459,4 +470,3 @@ exports.getAllRecords = async (
     throw err;
   }
 };
-

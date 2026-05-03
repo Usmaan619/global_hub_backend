@@ -9,7 +9,9 @@ exports.createRecord = async (req, res) => {
     res.status(201).json({ message: " created", id });
   } catch (error) {
     console.error("Controller:createRecord Error:", error, moment().format());
-    res.status(500).json({ message: "Server error while creating record" });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while creating record" });
   }
 };
 
@@ -57,14 +59,7 @@ exports.createRecord = async (req, res) => {
 
 exports.getAllRecords = async (req, res) => {
   try {
-    let {
-      id,
-      role,
-      scope,
-      page,
-      limit,
-      search = "",
-    } = req.query;
+    let { id, role, scope, page, limit, search = "" } = req.query;
 
     if (!role) {
       return res.status(400).json({ message: "Role is required" });
@@ -82,7 +77,7 @@ exports.getAllRecords = async (req, res) => {
       scope,
       page,
       limit,
-      search
+      search,
     );
 
     res.json({ success: true, record });
@@ -94,8 +89,6 @@ exports.getAllRecords = async (req, res) => {
     });
   }
 };
-
-
 
 exports.updateRecord = async (req, res) => {
   try {
@@ -157,7 +150,7 @@ exports.deleteCurrentMonthRecords = async (req, res) => {
 
       const result = await conn.query(
         "DELETE FROM records WHERE created_at >= ? AND created_at <= ?",
-        [startDate, endDate]
+        [startDate, endDate],
       );
       return res.status(200).json({
         message: ` ${
