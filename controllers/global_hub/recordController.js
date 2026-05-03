@@ -6,7 +6,9 @@ const axios = require("axios");
 exports.createRecord = async (req, res) => {
   try {
     const id = await recordModel.createRecord(req?.body);
-    res.status(201).json({ message: " created", id });
+    res
+      .status(201)
+      .json({ success: true, message: "Record created successfully", id });
   } catch (error) {
     console.error("Controller:createRecord Error:", error, moment().format());
     res

@@ -138,7 +138,7 @@ exports.createRecord = async (data) => {
     });
   } catch (error) {
     console.error("Model:createRecord Error:", error, moment().format());
-    throw new Error("Database error while creating record");
+    throw error;
   }
 };
 
